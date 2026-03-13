@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>logwatch</title>
+  <style>
+    /* ── Reset & Base ────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:           #0f1117;
+      --surface:      #1a1d27;
+      --surface2:     #22263a;
+      --border:       #2e3248;
+      --text:         #e2e6f0;
+      --text-muted:   #6b7280;
+      --text-dim:     #9ca3af;
+      --accent:       #6366f1;
+      --accent-glow:  rgba(99,102,241,.25);
+      --critical:     #ef4444;
+      --critical-bg:  rgba(239,68,68,.12);
+      --warn:         #f59e0b;
+      --warn-bg:      rgba(245,158,11,.12);
+      --info:         #3b82f6;
+      --info-bg:      rgba(59,130,246,.12);
+      --ok:           #10b981;
+      --radius:       10px;
+      --shadow:       0 4px 24px rgba(0,0,0,.4);
+      --font-mono:    'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+    html { font-size: 14px; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    a { color: var(--accent); text-decoration: none; }
+
+    /* ── Layout ──────────────────────────────────────────────────── */
+    .app { display: grid; grid-template-rows: auto 1fr; min-height: 100vh; }
+
+    /* ── Topbar ──────────────────────────────────────────────────── */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px;
+      height: 56px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      font-size: 18px; font-weight: 700; letter-spacing: -.5px;
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .logo span { font-weight: 300; opacity: .7; }
+    .status-pill {
+      display: flex; align-items: center; gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase;
+      background: rgba(16,185,129,.15); color: var(--ok);
+      border: 1px solid rgba(16,185,129,.3);
+      transition: all .3s;
+    }
+    .status-pill.offline { background: rgba(239,68,68,.15); color: var(--critical); border-color: rgba(239,68,68,.3); }
+    .status-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 6px currentColor;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; } 50% { opacity: .4; }
+    }
+    .status-pill.offline .status-dot { animation: none; }
+    .topbar-right { display: flex; align-items: center; gap: 16px; }
+    .uptime { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px; font-weight: 500;
+      cursor: pointer; border: none;
+      background: var(--surface2); color: var(--text-dim);
+      border: 1px solid var(--border);
+      transition: all .15s;
+    }
+    .btn:hover { background: var(--border); color: var(--text); }
+    .btn-accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-accent:hover { background: #4f46e5; border-color: #4f46e5; }
+
+    /* ── Main content ────────────────────────────────────────────── */
+    .main { padding: 24px 28px; display: grid; grid-template-columns: 1fr 340px; gap: 20px; }
+    @media (max-width: 900px) { .main { grid-template-columns: 1fr; } }
+
+    /* ── Cards ───────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-title {
+      font-size: 12px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .card-body { padding: 18px; }
+
+    /* ── Stat row ────────────────────────────────────────────────── */
+    .stat-row {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 700px) { .stat-row { grid-template-columns: repeat(2, 1fr); } }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      position: relative; overflow: hidden;
+      transition: border-color .2s;
+    }
+    .stat-card:hover { border-color: var(--accent); }
+    .stat-card::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, var(--accent-glow), transparent);
+      opacity: 0; transition: opacity .2s;
+    }
+    .stat-card:hover::before { opacity: 1; }
+    .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--text-muted); margin-bottom: 8px; }
+    .stat-value { font-size: 28px; font-weight: 700; font-family: var(--font-mono); color: var(--text); line-height: 1; }
+    .stat-value.critical { color: var(--critical); }
+    .stat-value.warn     { color: var(--warn); }
+    .stat-value.ok       { color: var(--ok); }
+    .stat-sub { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+    /* ── Alert feed ──────────────────────────────────────────────── */
+    .feed-wrap { display: flex; flex-direction: column; gap: 20px; }
+    .feed-controls {
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 18px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .filter-btn {
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 11px; font-weight: 600; letter-spacing: .4px;
+      cursor: pointer; border: 1px solid transparent;
+      background: transparent; color: var(--text-muted);
+      transition: all .15s;
+    }
+    .filter-btn:hover, .filter-btn.active { background: var(--surface2); color: var(--text); border-color: var(--border); }
+    .filter-btn.f-critical.active { background: var(--critical-bg); color: var(--critical); border-color: rgba(239,68,68,.4); }
+    .filter-btn.f-warn.active     { background: var(--warn-bg);     color: var(--warn);     border-color: rgba(245,158,11,.4); }
+    .filter-btn.f-info.active     { background: var(--info-bg);     color: var(--info);     border-color: rgba(59,130,246,.4); }
+    .feed-spacer { flex: 1; }
+    #alert-count-badge {
+      font-size: 11px; font-family: var(--font-mono);
+      color: var(--text-muted); white-space: nowrap;
+    }
+    .pause-btn { font-size: 18px; padding: 0 8px; cursor: pointer; background: none; border: none; color: var(--text-muted); transition: color .15s; }
+    .pause-btn:hover { color: var(--text); }
+    .feed {
+      max-height: 480px; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 10px 14px;
+      scroll-behavior: smooth;
+    }
+    .feed::-webkit-scrollbar { width: 4px; }
+    .feed::-webkit-scrollbar-track { background: transparent; }
+    .feed::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── Alert item ──────────────────────────────────────────────── */
+    .alert-item {
+      display: grid;
+      grid-template-columns: auto auto 1fr auto;
+      gap: 10px; align-items: start;
+      padding: 10px 12px;
+      border-radius: 7px;
+      border: 1px solid transparent;
+      transition: background .15s, border-color .15s;
+      animation: slide-in .2s ease-out;
+      cursor: default;
+    }
+    @keyframes slide-in {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .alert-item:hover { background: var(--surface2); border-color: var(--border); }
+    .alert-item.CRITICAL { border-left: 3px solid var(--critical); }
+    .alert-item.WARN     { border-left: 3px solid var(--warn); }
+    .alert-item.INFO     { border-left: 3px solid var(--info); }
+    .severity-badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .badge-CRITICAL { background: var(--critical-bg); color: var(--critical); }
+    .badge-WARN     { background: var(--warn-bg);     color: var(--warn); }
+    .badge-INFO     { background: var(--info-bg);     color: var(--info); }
+    .rule-tag {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px; font-weight: 600;
+      background: var(--surface2); color: var(--text-muted);
+      border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .alert-msg {
+      font-family: var(--font-mono);
+      font-size: 12px; color: var(--text-dim);
+      word-break: break-all; line-height: 1.5;
+    }
+    .alert-msg strong { color: var(--text); }
+    .alert-time {
+      font-family: var(--font-mono);
+      font-size: 10px; color: var(--text-muted);
+      white-space: nowrap; padding-top: 2px;
+    }
+    .feed-empty {
+      text-align: center; padding: 40px 20px;
+      color: var(--text-muted); font-size: 13px;
+    }
+    .feed-empty .icon { font-size: 32px; display: block; margin-bottom: 10px; opacity: .4; }
+
+    /* ── Sidebar ─────────────────────────────────────────────────── */
+    .sidebar { display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── Rules table ─────────────────────────────────────────────── */
+    .rules-list { display: flex; flex-direction: column; gap: 0; }
+    .rule-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border);
+      transition: background .15s;
+    }
+    .rule-row:last-child { border-bottom: none; }
+    .rule-row:hover { background: var(--surface2); }
+    .rule-name { font-size: 13px; font-weight: 500; color: var(--text); }
+    .rule-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .rule-count {
+      font-family: var(--font-mono); font-size: 13px; font-weight: 700;
+      color: var(--text-muted);
+      min-width: 32px; text-align: right;
+    }
+    .rule-count.has-alerts { color: var(--critical); }
+
+    /* ── Files list ──────────────────────────────────────────────── */
+    .files-list { display: flex; flex-direction: column; gap: 0; }
+    .file-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .file-row:last-child { border-bottom: none; }
+    .file-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex-shrink: 0; box-shadow: 0 0 5px var(--ok); animation: pulse 2s infinite; }
+    .file-path { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); word-break: break-all; }
+
+    /* ── Config card ─────────────────────────────────────────────── */
+    .config-path { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); padding: 12px 18px; word-break: break-all; }
+
+    /* ── Empty/loading states ────────────────────────────────────── */
+    .loading { color: var(--text-muted); font-size: 12px; padding: 16px 18px; text-align: center; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Topbar ─────────────────────────────────────────────────── -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="logo">log<span>watch</span></div>
+      <div class="status-pill offline" id="status-pill">
+        <span class="status-dot"></span>
+        <span id="status-text">connecting</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="uptime" id="uptime-display">—</span>
+      <button class="btn" onclick="clearFeed()">🗑 Clear</button>
+      <button class="btn btn-accent" onclick="pollStatus()">↺ Refresh</button>
+    </div>
+  </header>
+
+  <!-- ── Main ───────────────────────────────────────────────────── -->
+  <div class="main">
+
+    <!-- ── Left column ──────────────────────────────────────────── -->
+    <div class="feed-wrap">
+
+      <!-- Stat cards -->
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="stat-label">Total Alerts</div>
+          <div class="stat-value" id="stat-alerts">—</div>
+          <div class="stat-sub">since daemon start</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active Files</div>
+          <div class="stat-value ok" id="stat-files">—</div>
+          <div class="stat-sub">being watched</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Rules</div>
+          <div class="stat-value" id="stat-rules">—</div>
+          <div class="stat-sub">active rules</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">PID</div>
+          <div class="stat-value" id="stat-pid">—</div>
+          <div class="stat-sub" id="stat-config">—</div>
+        </div>
+      </div>
+
+      <!-- Alert feed -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Live Alert Feed</span>
+        </div>
+        <div class="feed-controls">
+          <button class="filter-btn active" onclick="setFilter('ALL',this)">All</button>
+          <button class="filter-btn f-critical" onclick="setFilter('CRITICAL',this)">🔴 Critical</button>
+          <button class="filter-btn f-warn"     onclick="setFilter('WARN',this)">🟡 Warn</button>
+          <button class="filter-btn f-info"     onclick="setFilter('INFO',this)">🔵 Info</button>
+          <div class="feed-spacer"></div>
+          <span id="alert-count-badge">0 alerts</span>
+          <button class="pause-btn" id="pause-btn" onclick="togglePause()" title="Pause feed">⏸</button>
+        </div>
+        <div class="feed" id="alert-feed">
+          <div class="feed-empty">
+            <span class="icon">👁</span>
+            Watching for alerts...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Sidebar ────────────────────────────────────────────────── -->
+    <div class="sidebar">
+
+      <!-- Rules -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Rules</span>
+          <span id="rules-count" style="font-size:11px;color:var(--text-muted)">—</span>
+        </div>
+        <div class="rules-list" id="rules-list">
+          <div class="loading">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Watched files -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Watched Files</span>
+          <span class="status-dot" style="background:var(--ok);box-shadow:0 0 5px var(--ok)"></span>
+        </div>
+        <div class="files-list" id="files-list">
+          <div class="loading">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Config -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Config</span>
+        </div>
+        <div class="config-path" id="config-path">—</div>
+      </div>
+
+    </div>
+  </div><!-- .main -->
+</div><!-- .app -->
+
+<script>
+  // ── State ────────────────────────────────────────────────────────
+  let alerts = [];
+  let filter = 'ALL';
+  let paused = false;
+  let totalAlertCount = 0;
+  const MAX_ALERTS = 500;
+  const ruleCounts = {};
+
+  // ── SSE: live alerts ─────────────────────────────────────────────
+  function connectSSE() {
+    const es = new EventSource('/api/events');
+
+    es.onopen = () => setOnline(true);
+
+    es.addEventListener('alert', e => {
+      const alert = JSON.parse(e.data);
+      onAlert(alert);
+    });
+
+    es.onerror = () => {
+      setOnline(false);
+      es.close();
+      setTimeout(connectSSE, 3000); // reconnect
+    };
+  }
+
+  function onAlert(a) {
+    totalAlertCount++;
+    ruleCounts[a.rule] = (ruleCounts[a.rule] || 0) + 1;
+    alerts.unshift(a);
+    if (alerts.length > MAX_ALERTS) alerts.pop();
+
+    updateAlertBadge();
+    updateStatAlerts();
+    updateRuleCounts();
+
+    if (!paused) renderFeed();
+  }
+
+  // ── Status polling ───────────────────────────────────────────────
+  function pollStatus() {
+    fetch('/api/status')
+      .then(r => r.json())
+      .then(s => {
+        setOnline(true);
+        document.getElementById('stat-alerts').textContent  = s.alert_count;
+        document.getElementById('stat-files').textContent   = s.files ? s.files.length : 0;
+        document.getElementById('stat-rules').textContent   = s.rule_count;
+        document.getElementById('stat-pid').textContent     = s.pid;
+        document.getElementById('config-path').textContent  = s.config_path || '—';
+        document.getElementById('uptime-display').textContent = s.uptime || '—';
+
+        const cfgEl = document.getElementById('stat-config');
+        if (s.config_path) {
+          const parts = s.config_path.split('/');
+          cfgEl.textContent = parts[parts.length - 1];
+        }
+
+        renderFiles(s.files || []);
+        renderRules(s.rule_count);
+      })
+      .catch(() => setOnline(false));
+  }
+
+  // ── Render helpers ───────────────────────────────────────────────
+  function renderFeed() {
+    const feed = document.getElementById('alert-feed');
+    const visible = filter === 'ALL' ? alerts : alerts.filter(a => a.severity === filter);
+
+    if (visible.length === 0) {
+      feed.innerHTML = `<div class="feed-empty"><span class="icon">👁</span>No ${filter === 'ALL' ? '' : filter + ' '}alerts yet...</div>`;
+      return;
+    }
+
+    feed.innerHTML = visible.map(a => `
+      <div class="alert-item ${a.severity}">
+        <span class="severity-badge badge-${a.severity}">${a.severity}</span>
+        <span class="rule-tag">${esc(a.rule)}</span>
+        <span class="alert-msg">${esc(a.message)}</span>
+        <span class="alert-time">${fmtTime(a.time)}</span>
+      </div>
+    `).join('');
+  }
+
+  function renderFiles(files) {
+    const el = document.getElementById('files-list');
+    if (!files.length) {
+      el.innerHTML = '<div class="loading">No files configured</div>';
+      return;
+    }
+    el.innerHTML = files.map(f => `
+      <div class="file-row">
+        <span class="file-dot"></span>
+        <span class="file-path">${esc(f)}</span>
+      </div>
+    `).join('');
+  }
+
+  function renderRules(count) {
+    const el = document.getElementById('rules-list');
+    document.getElementById('rules-count').textContent = count + ' rules';
+    if (!count) {
+      el.innerHTML = '<div class="loading">No rules loaded</div>';
+      return;
+    }
+    // Derive rule list from alert history
+    const seen = new Set(alerts.map(a => a.rule));
+    if (!seen.size) {
+      el.innerHTML = '<div class="loading">No alerts fired yet</div>';
+      return;
+    }
+    el.innerHTML = [...seen].map(name => {
+      const n = ruleCounts[name] || 0;
+      return `
+        <div class="rule-row">
+          <div>
+            <div class="rule-name">${esc(name)}</div>
+          </div>
+          <div class="rule-count ${n > 0 ? 'has-alerts' : ''}">${n}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function updateRuleCounts() {
+    const el = document.getElementById('rules-list');
+    const rows = el.querySelectorAll('.rule-row');
+    if (!rows.length) renderRules(Object.keys(ruleCounts).length);
+    else {
+      rows.forEach(row => {
+        const name = row.querySelector('.rule-name')?.textContent;
+        const countEl = row.querySelector('.rule-count');
+        if (name && countEl) {
+          const n = ruleCounts[name] || 0;
+          countEl.textContent = n;
+          countEl.className = 'rule-count' + (n > 0 ? ' has-alerts' : '');
+        }
+      });
+    }
+  }
+
+  function updateAlertBadge() {
+    const visible = filter === 'ALL' ? alerts : alerts.filter(a => a.severity === filter);
+    document.getElementById('alert-count-badge').textContent =
+      visible.length + ' alert' + (visible.length !== 1 ? 's' : '');
+  }
+
+  function updateStatAlerts() {
+    document.getElementById('stat-alerts').textContent = totalAlertCount;
+    const el = document.getElementById('stat-alerts');
+    el.classList.toggle('critical', totalAlertCount > 0);
+  }
+
+  // ── Controls ─────────────────────────────────────────────────────
+  function setFilter(f, btn) {
+    filter = f;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    updateAlertBadge();
+    renderFeed();
+  }
+
+  function togglePause() {
+    paused = !paused;
+    const btn = document.getElementById('pause-btn');
+    btn.textContent = paused ? '▶' : '⏸';
+    btn.title = paused ? 'Resume feed' : 'Pause feed';
+    if (!paused) renderFeed();
+  }
+
+  function clearFeed() {
+    alerts = [];
+    Object.keys(ruleCounts).forEach(k => delete ruleCounts[k]);
+    totalAlertCount = 0;
+    updateAlertBadge();
+    updateStatAlerts();
+    renderFeed();
+    renderRules(0);
+  }
+
+  // ── Utilities ─────────────────────────────────────────────────────
+  function setOnline(online) {
+    const pill = document.getElementById('status-pill');
+    const text = document.getElementById('status-text');
+    pill.className = 'status-pill' + (online ? '' : ' offline');
+    text.textContent = online ? 'running' : 'offline';
+  }
+
+  function fmtTime(iso) {
+    const d = new Date(iso);
+    return d.toLocaleTimeString('en-GB', { hour12: false });
+  }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────
+  pollStatus();
+  setInterval(pollStatus, 10000);
+  connectSSE();
+</script>
+</body>
+</html>
