@@ -67,12 +67,12 @@ func compile(cfgs []config.Rule) []*compiled {
 // matches returns true when the entry satisfies the rule's field + pattern + level filters.
 func (c *compiled) matches(e parser.LogEntry) bool {
 	// Optional level filter (e.g. only match entries at "error" or above).
-	if c.Level != "" && !levelAtLeast(e.Level, c.Level) {
+	if c.Rule.Level != "" && !levelAtLeast(e.Level, c.Rule.Level) {
 		return false
 	}
 
 	// Determine which string to test the pattern against.
-	target := resolveField(e, c.Field)
+	target := resolveField(e, c.Rule.Field)
 	return c.re.MatchString(target)
 }
 

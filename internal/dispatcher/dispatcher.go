@@ -11,12 +11,26 @@ import (
 	"time"
 
 	"github.com/sammug/logwatch/config"
+	"github.com/sammug/logwatch/internal/control"
 	"github.com/sammug/logwatch/internal/rules"
 )
 
-// Dispatch reads alerts and fans each one out to its configured targets.
-func Dispatch(cfg *config.Config, alerts <-chan rules.Alert) {
+// Dispatch reads alerts, increments stats, publishes to tail subscribers,
+// and fans each alert out to its configured output targets.
+func Dispatch(cfg *config.Config, alerts <-chan rules.Alert, stats *control.Stats, broker *control.Broker) {
 	for a := range alerts {
+		stats.IncAlerts()
+
+		// Publish to any connected `logwatch tail` clients.
+		broker.Publish(control.TailEvent{
+			Time:     a.Time.Format(time.RFC3339),
+			Severity: a.Severity,
+			Rule:     a.RuleName,
+			Level:    a.Entry.Level,
+			Source:   a.Entry.Source,
+			Message:  a.Entry.Message,
+		})
+
 		for _, action := range a.Actions {
 			switch action {
 			case "stdout":
@@ -67,7 +81,6 @@ func writeFile(path string, a rules.Alert) {
 
 func sendWebhook(url string, a rules.Alert) {
 	if url == "" {
-		log.Println("dispatcher: webhook_url not set in [output]")
 		return
 	}
 
@@ -89,13 +102,12 @@ func sendWebhook(url string, a rules.Alert) {
 	body, _ := json.Marshal(payload)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		log.Printf("dispatcher: webhook: %v", err)
+		log.Printf("dispatcher: slack webhook: %v", err)
 		return
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode >= 300 {
-		log.Printf("dispatcher: webhook returned %d", resp.StatusCode)
+		log.Printf("dispatcher: slack webhook returned %d", resp.StatusCode)
 	}
 }
 
