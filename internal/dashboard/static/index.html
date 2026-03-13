@@ -5,590 +5,469 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>logwatch</title>
   <style>
-    /* ── Reset & Base ────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg:           #0f1117;
-      --surface:      #1a1d27;
-      --surface2:     #22263a;
-      --border:       #2e3248;
-      --text:         #e2e6f0;
-      --text-muted:   #6b7280;
-      --text-dim:     #9ca3af;
-      --accent:       #6366f1;
-      --accent-glow:  rgba(99,102,241,.25);
-      --critical:     #ef4444;
-      --critical-bg:  rgba(239,68,68,.12);
-      --warn:         #f59e0b;
-      --warn-bg:      rgba(245,158,11,.12);
-      --info:         #3b82f6;
-      --info-bg:      rgba(59,130,246,.12);
-      --ok:           #10b981;
-      --radius:       10px;
-      --shadow:       0 4px 24px rgba(0,0,0,.4);
-      --font-mono:    'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+      --bg:          #0d1117;
+      --surface:     #161b22;
+      --surface2:    #1f2937;
+      --surface3:    #273244;
+      --border:      #30363d;
+      --border2:     #3d4a5c;
+      --text:        #e6edf3;
+      --text-muted:  #7d8590;
+      --text-dim:    #adbac7;
+      --accent:      #58a6ff;
+      --critical:    #f85149;
+      --critical-bg: rgba(248,81,73,.1);
+      --warn:        #e3b341;
+      --warn-bg:     rgba(227,179,65,.1);
+      --info:        #58a6ff;
+      --info-bg:     rgba(88,166,255,.1);
+      --ok:          #3fb950;
+      --ok-bg:       rgba(63,185,80,.1);
+      --radius:      8px;
+      --mono:        'JetBrains Mono','Fira Code','Cascadia Code',ui-monospace,monospace;
     }
     html { font-size: 14px; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      min-height: 100vh;
-      line-height: 1.5;
-    }
-    a { color: var(--accent); text-decoration: none; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; min-height: 100vh; }
 
-    /* ── Layout ──────────────────────────────────────────────────── */
-    .app { display: grid; grid-template-rows: auto 1fr; min-height: 100vh; }
-
-    /* ── Topbar ──────────────────────────────────────────────────── */
+    /* ── Topbar ── */
     .topbar {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 28px;
-      height: 56px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
+      padding: 0 24px; height: 54px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
       position: sticky; top: 0; z-index: 100;
     }
-    .topbar-left { display: flex; align-items: center; gap: 12px; }
-    .logo {
-      font-size: 18px; font-weight: 700; letter-spacing: -.5px;
-      background: linear-gradient(135deg, var(--accent), #a78bfa);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .logo { font-size: 17px; font-weight: 700; letter-spacing: -.4px; }
+    .logo em { color: var(--accent); font-style: normal; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 999px;
+      font-size: 11px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase;
+      background: var(--ok-bg); color: var(--ok); border: 1px solid rgba(63,185,80,.3);
     }
-    .logo span { font-weight: 300; opacity: .7; }
-    .status-pill {
-      display: flex; align-items: center; gap: 6px;
-      padding: 3px 10px;
-      border-radius: 999px;
-      font-size: 11px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase;
-      background: rgba(16,185,129,.15); color: var(--ok);
-      border: 1px solid rgba(16,185,129,.3);
-      transition: all .3s;
-    }
-    .status-pill.offline { background: rgba(239,68,68,.15); color: var(--critical); border-color: rgba(239,68,68,.3); }
-    .status-dot {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: currentColor;
-      box-shadow: 0 0 6px currentColor;
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; } 50% { opacity: .4; }
-    }
-    .status-pill.offline .status-dot { animation: none; }
-    .topbar-right { display: flex; align-items: center; gap: 16px; }
-    .uptime { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
-    .btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 6px 14px;
-      border-radius: 6px;
-      font-size: 12px; font-weight: 500;
-      cursor: pointer; border: none;
-      background: var(--surface2); color: var(--text-dim);
-      border: 1px solid var(--border);
-      transition: all .15s;
-    }
-    .btn:hover { background: var(--border); color: var(--text); }
-    .btn-accent { background: var(--accent); color: #fff; border-color: var(--accent); }
-    .btn-accent:hover { background: #4f46e5; border-color: #4f46e5; }
+    .pill.offline { background: var(--critical-bg); color: var(--critical); border-color: rgba(248,81,73,.3); }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 5px currentColor; animation: blink 2s infinite; }
+    .pill.offline .dot { animation: none; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    .uptime-badge { font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
+    .btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--surface2); color: var(--text-dim); transition: all .15s; }
+    .btn:hover { background: var(--surface3); color: var(--text); border-color: var(--border2); }
+    .btn-primary { background: var(--accent); color: #0d1117; border-color: var(--accent); font-weight: 600; }
+    .btn-primary:hover { background: #79c0ff; border-color: #79c0ff; }
 
-    /* ── Main content ────────────────────────────────────────────── */
-    .main { padding: 24px 28px; display: grid; grid-template-columns: 1fr 340px; gap: 20px; }
-    @media (max-width: 900px) { .main { grid-template-columns: 1fr; } }
+    /* ── Layout ── */
+    .layout { display: grid; grid-template-columns: 1fr 300px; gap: 0; height: calc(100vh - 54px); }
+    @media(max-width:860px){ .layout{ grid-template-columns:1fr; } }
 
-    /* ── Cards ───────────────────────────────────────────────────── */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-    }
-    .card-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 18px;
+    /* ── Stats strip ── */
+    .stats-strip {
+      display: grid; grid-template-columns: repeat(4,1fr);
       border-bottom: 1px solid var(--border);
     }
-    .card-title {
-      font-size: 12px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase;
-      color: var(--text-muted);
-    }
-    .card-body { padding: 18px; }
-
-    /* ── Stat row ────────────────────────────────────────────────── */
-    .stat-row {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
-      margin-bottom: 20px;
-    }
-    @media (max-width: 700px) { .stat-row { grid-template-columns: repeat(2, 1fr); } }
-    .stat-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px 20px;
-      position: relative; overflow: hidden;
-      transition: border-color .2s;
-    }
-    .stat-card:hover { border-color: var(--accent); }
-    .stat-card::before {
-      content: ''; position: absolute; inset: 0;
-      background: linear-gradient(135deg, var(--accent-glow), transparent);
-      opacity: 0; transition: opacity .2s;
-    }
-    .stat-card:hover::before { opacity: 1; }
-    .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--text-muted); margin-bottom: 8px; }
-    .stat-value { font-size: 28px; font-weight: 700; font-family: var(--font-mono); color: var(--text); line-height: 1; }
-    .stat-value.critical { color: var(--critical); }
-    .stat-value.warn     { color: var(--warn); }
-    .stat-value.ok       { color: var(--ok); }
-    .stat-sub { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
-
-    /* ── Alert feed ──────────────────────────────────────────────── */
-    .feed-wrap { display: flex; flex-direction: column; gap: 20px; }
-    .feed-controls {
-      display: flex; align-items: center; gap: 10px;
-      padding: 0 18px 14px;
-      border-bottom: 1px solid var(--border);
-      flex-wrap: wrap;
-    }
-    .filter-btn {
-      padding: 4px 12px;
-      border-radius: 999px;
-      font-size: 11px; font-weight: 600; letter-spacing: .4px;
-      cursor: pointer; border: 1px solid transparent;
-      background: transparent; color: var(--text-muted);
-      transition: all .15s;
-    }
-    .filter-btn:hover, .filter-btn.active { background: var(--surface2); color: var(--text); border-color: var(--border); }
-    .filter-btn.f-critical.active { background: var(--critical-bg); color: var(--critical); border-color: rgba(239,68,68,.4); }
-    .filter-btn.f-warn.active     { background: var(--warn-bg);     color: var(--warn);     border-color: rgba(245,158,11,.4); }
-    .filter-btn.f-info.active     { background: var(--info-bg);     color: var(--info);     border-color: rgba(59,130,246,.4); }
-    .feed-spacer { flex: 1; }
-    #alert-count-badge {
-      font-size: 11px; font-family: var(--font-mono);
-      color: var(--text-muted); white-space: nowrap;
-    }
-    .pause-btn { font-size: 18px; padding: 0 8px; cursor: pointer; background: none; border: none; color: var(--text-muted); transition: color .15s; }
-    .pause-btn:hover { color: var(--text); }
-    .feed {
-      max-height: 480px; overflow-y: auto;
-      display: flex; flex-direction: column; gap: 2px;
-      padding: 10px 14px;
-      scroll-behavior: smooth;
-    }
-    .feed::-webkit-scrollbar { width: 4px; }
-    .feed::-webkit-scrollbar-track { background: transparent; }
-    .feed::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-    /* ── Alert item ──────────────────────────────────────────────── */
-    .alert-item {
-      display: grid;
-      grid-template-columns: auto auto 1fr auto;
-      gap: 10px; align-items: start;
-      padding: 10px 12px;
-      border-radius: 7px;
-      border: 1px solid transparent;
-      transition: background .15s, border-color .15s;
-      animation: slide-in .2s ease-out;
-      cursor: default;
-    }
-    @keyframes slide-in {
-      from { opacity: 0; transform: translateY(-6px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    .alert-item:hover { background: var(--surface2); border-color: var(--border); }
-    .alert-item.CRITICAL { border-left: 3px solid var(--critical); }
-    .alert-item.WARN     { border-left: 3px solid var(--warn); }
-    .alert-item.INFO     { border-left: 3px solid var(--info); }
-    .severity-badge {
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 10px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase;
-      white-space: nowrap;
-    }
-    .badge-CRITICAL { background: var(--critical-bg); color: var(--critical); }
-    .badge-WARN     { background: var(--warn-bg);     color: var(--warn); }
-    .badge-INFO     { background: var(--info-bg);     color: var(--info); }
-    .rule-tag {
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 10px; font-weight: 600;
-      background: var(--surface2); color: var(--text-muted);
-      border: 1px solid var(--border);
-      white-space: nowrap;
-    }
-    .alert-msg {
-      font-family: var(--font-mono);
-      font-size: 12px; color: var(--text-dim);
-      word-break: break-all; line-height: 1.5;
-    }
-    .alert-msg strong { color: var(--text); }
-    .alert-time {
-      font-family: var(--font-mono);
-      font-size: 10px; color: var(--text-muted);
-      white-space: nowrap; padding-top: 2px;
-    }
-    .feed-empty {
-      text-align: center; padding: 40px 20px;
-      color: var(--text-muted); font-size: 13px;
-    }
-    .feed-empty .icon { font-size: 32px; display: block; margin-bottom: 10px; opacity: .4; }
-
-    /* ── Sidebar ─────────────────────────────────────────────────── */
-    .sidebar { display: flex; flex-direction: column; gap: 20px; }
-
-    /* ── Rules table ─────────────────────────────────────────────── */
-    .rules-list { display: flex; flex-direction: column; gap: 0; }
-    .rule-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 18px;
-      border-bottom: 1px solid var(--border);
+    .stat {
+      padding: 14px 20px; border-right: 1px solid var(--border);
       transition: background .15s;
     }
-    .rule-row:last-child { border-bottom: none; }
+    .stat:last-child { border-right: none; }
+    .stat:hover { background: var(--surface2); }
+    .stat-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--text-muted); margin-bottom: 6px; }
+    .stat-val { font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
+    .stat-val.red  { color: var(--critical); }
+    .stat-val.green{ color: var(--ok); }
+    .stat-val.blue { color: var(--accent); }
+    .stat-sub { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+
+    /* ── Left panel ── */
+    .left-panel { display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0; flex-wrap: wrap;
+    }
+    .filter { padding: 4px 11px; border-radius: 999px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid transparent; background: transparent; color: var(--text-muted); transition: all .12s; }
+    .filter:hover { background: var(--surface2); color: var(--text); }
+    .filter.on { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+    .filter.on.fc { background: var(--critical-bg); color: var(--critical); border-color: rgba(248,81,73,.4); }
+    .filter.on.fw { background: var(--warn-bg);     color: var(--warn);     border-color: rgba(227,179,65,.4); }
+    .filter.on.fi { background: var(--info-bg);     color: var(--info);     border-color: rgba(88,166,255,.4); }
+    .spacer { flex: 1; }
+    .count-label { font-family: var(--mono); font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+    .icon-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; transition: all .12s; }
+    .icon-btn:hover { background: var(--surface2); color: var(--text); }
+
+    /* ── Feed ── */
+    .feed { flex: 1; overflow-y: auto; padding: 8px; }
+    .feed::-webkit-scrollbar { width: 4px; }
+    .feed::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    /* ── Alert card ── */
+    .alert-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 6px;
+      overflow: hidden;
+      transition: border-color .15s;
+      animation: pop .18s ease-out;
+    }
+    @keyframes pop { from{opacity:0;transform:translateY(-5px)} to{opacity:1;transform:none} }
+    .alert-card:hover { border-color: var(--border2); }
+    .alert-card.CRITICAL { border-left: 3px solid var(--critical); }
+    .alert-card.WARN     { border-left: 3px solid var(--warn); }
+    .alert-card.INFO     { border-left: 3px solid var(--info); }
+
+    .alert-head {
+      display: grid;
+      grid-template-columns: auto auto auto 1fr auto auto;
+      align-items: center; gap: 8px;
+      padding: 9px 12px;
+      cursor: pointer;
+      background: var(--surface);
+      transition: background .12s;
+    }
+    .alert-head:hover { background: var(--surface2); }
+
+    /* severity badge */
+    .sev { padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; white-space: nowrap; }
+    .sev-CRITICAL { background: var(--critical-bg); color: var(--critical); }
+    .sev-WARN     { background: var(--warn-bg);     color: var(--warn); }
+    .sev-INFO     { background: var(--info-bg);     color: var(--info); }
+
+    /* format badge */
+    .fmt { padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; background: var(--surface3); color: var(--text-muted); border: 1px solid var(--border); white-space: nowrap; font-family: var(--mono); }
+    .fmt-json    { color: #7ee787; border-color: rgba(126,231,135,.3); }
+    .fmt-syslog  { color: #d2a8ff; border-color: rgba(210,168,255,.3); }
+    .fmt-apache  { color: #ffa657; border-color: rgba(255,166,87,.3); }
+
+    /* rule tag */
+    .rule-tag { padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; background: var(--surface3); color: var(--text-muted); border: 1px solid var(--border); white-space: nowrap; }
+
+    /* message */
+    .alert-msg { font-family: var(--mono); font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+    /* time */
+    .alert-time { font-family: var(--mono); font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+
+    /* chevron */
+    .chevron { font-size: 10px; color: var(--text-muted); transition: transform .2s; flex-shrink: 0; }
+    .alert-card.open .chevron { transform: rotate(90deg); }
+
+    /* ── Expanded detail ── */
+    .alert-detail {
+      display: none;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      padding: 12px 14px;
+      font-size: 12px;
+    }
+    .alert-card.open .alert-detail { display: block; }
+
+    .detail-grid { display: grid; grid-template-columns: 120px 1fr; gap: 4px 10px; margin-bottom: 12px; }
+    .dk { font-weight: 600; color: var(--text-muted); font-family: var(--mono); font-size: 11px; padding: 3px 0; }
+    .dv { font-family: var(--mono); font-size: 11px; color: var(--text-dim); padding: 3px 0; word-break: break-all; }
+    .dv.red   { color: var(--critical); }
+    .dv.amber { color: var(--warn); }
+    .dv.blue  { color: var(--accent); }
+    .dv.green { color: var(--ok); }
+
+    .fields-title {
+      font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px;
+      color: var(--text-muted); margin-bottom: 8px; margin-top: 4px;
+      border-top: 1px solid var(--border); padding-top: 10px;
+    }
+    .fields-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(200px,1fr)); gap: 6px; }
+    .field-chip {
+      display: flex; gap: 6px; align-items: baseline;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 5px; padding: 5px 9px;
+    }
+    .field-k { font-family: var(--mono); font-size: 10px; color: var(--accent); font-weight: 600; flex-shrink: 0; }
+    .field-v { font-family: var(--mono); font-size: 11px; color: var(--text-dim); word-break: break-all; }
+
+    .raw-block {
+      margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px;
+    }
+    .raw-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); margin-bottom: 6px; }
+    .raw-text {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 5px;
+      padding: 8px 12px; font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+      word-break: break-all; white-space: pre-wrap; line-height: 1.6;
+    }
+
+    /* ── Empty state ── */
+    .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty-icon { font-size: 36px; opacity: .25; margin-bottom: 12px; }
+    .empty p { font-size: 13px; }
+
+    /* ── Right sidebar ── */
+    .sidebar { overflow-y: auto; background: var(--surface); }
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+    .section { border-bottom: 1px solid var(--border); }
+    .section-head { padding: 11px 16px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text-muted); display: flex; align-items: center; justify-content: space-between; }
+    .section-badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 7px; font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+
+    .rule-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-top: 1px solid var(--border); transition: background .12s; }
     .rule-row:hover { background: var(--surface2); }
-    .rule-name { font-size: 13px; font-weight: 500; color: var(--text); }
-    .rule-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-    .rule-count {
-      font-family: var(--font-mono); font-size: 13px; font-weight: 700;
-      color: var(--text-muted);
-      min-width: 32px; text-align: right;
-    }
-    .rule-count.has-alerts { color: var(--critical); }
+    .rule-info { }
+    .rule-name { font-size: 12px; font-weight: 500; color: var(--text); }
+    .rule-sev  { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+    .rule-n    { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--text-muted); }
+    .rule-n.hot { color: var(--critical); }
 
-    /* ── Files list ──────────────────────────────────────────────── */
-    .files-list { display: flex; flex-direction: column; gap: 0; }
-    .file-row {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 18px;
-      border-bottom: 1px solid var(--border);
-    }
-    .file-row:last-child { border-bottom: none; }
-    .file-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex-shrink: 0; box-shadow: 0 0 5px var(--ok); animation: pulse 2s infinite; }
-    .file-path { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); word-break: break-all; }
+    .file-row { display: flex; align-items: flex-start; gap: 9px; padding: 9px 16px; border-top: 1px solid var(--border); }
+    .file-led { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 5px var(--ok); margin-top: 4px; flex-shrink: 0; animation: blink 3s infinite; }
+    .file-path { font-family: var(--mono); font-size: 11px; color: var(--text-dim); word-break: break-all; }
 
-    /* ── Config card ─────────────────────────────────────────────── */
-    .config-path { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); padding: 12px 18px; word-break: break-all; }
-
-    /* ── Empty/loading states ────────────────────────────────────── */
-    .loading { color: var(--text-muted); font-size: 12px; padding: 16px 18px; text-align: center; }
+    .meta-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-top: 1px solid var(--border); }
+    .meta-k { font-size: 11px; color: var(--text-muted); }
+    .meta-v { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
   </style>
 </head>
 <body>
-<div class="app">
 
-  <!-- ── Topbar ─────────────────────────────────────────────────── -->
-  <header class="topbar">
-    <div class="topbar-left">
-      <div class="logo">log<span>watch</span></div>
-      <div class="status-pill offline" id="status-pill">
-        <span class="status-dot"></span>
-        <span id="status-text">connecting</span>
-      </div>
+<!-- ── Topbar ──────────────────────────────────────────────────── -->
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">log<em>watch</em></div>
+    <div class="pill offline" id="pill"><span class="dot"></span><span id="pill-text">connecting</span></div>
+  </div>
+  <div class="topbar-right">
+    <span class="uptime-badge" id="uptime">—</span>
+    <button class="btn" onclick="clearFeed()">🗑 Clear</button>
+    <button class="btn btn-primary" onclick="pollStatus()">↺ Refresh</button>
+  </div>
+</header>
+
+<!-- ── Stats strip ──────────────────────────────────────────────── -->
+<div class="stats-strip">
+  <div class="stat"><div class="stat-label">Total Alerts</div><div class="stat-val red" id="s-alerts">—</div><div class="stat-sub">since start</div></div>
+  <div class="stat"><div class="stat-label">Watched Files</div><div class="stat-val green" id="s-files">—</div><div class="stat-sub">active</div></div>
+  <div class="stat"><div class="stat-label">Rules</div><div class="stat-val blue" id="s-rules">—</div><div class="stat-sub">loaded</div></div>
+  <div class="stat"><div class="stat-label">Uptime</div><div class="stat-val" id="s-uptime">—</div><div class="stat-sub" id="s-pid">pid —</div></div>
+</div>
+
+<!-- ── Main layout ───────────────────────────────────────────────── -->
+<div class="layout">
+
+  <!-- left: feed -->
+  <div class="left-panel">
+    <div class="toolbar">
+      <button class="filter on"    onclick="setFilter('ALL',this)">All</button>
+      <button class="filter fc"    onclick="setFilter('CRITICAL',this)">🔴 Critical</button>
+      <button class="filter fw"    onclick="setFilter('WARN',this)">🟡 Warn</button>
+      <button class="filter fi"    onclick="setFilter('INFO',this)">🔵 Info</button>
+      <div class="spacer"></div>
+      <span class="count-label" id="count-lbl">0 alerts</span>
+      <button class="icon-btn" id="pause-btn" onclick="togglePause()" title="Pause">⏸</button>
     </div>
-    <div class="topbar-right">
-      <span class="uptime" id="uptime-display">—</span>
-      <button class="btn" onclick="clearFeed()">🗑 Clear</button>
-      <button class="btn btn-accent" onclick="pollStatus()">↺ Refresh</button>
+    <div class="feed" id="feed">
+      <div class="empty"><div class="empty-icon">👁</div><p>Watching for alerts…</p></div>
     </div>
-  </header>
+  </div>
 
-  <!-- ── Main ───────────────────────────────────────────────────── -->
-  <div class="main">
+  <!-- right: sidebar -->
+  <div class="sidebar">
 
-    <!-- ── Left column ──────────────────────────────────────────── -->
-    <div class="feed-wrap">
-
-      <!-- Stat cards -->
-      <div class="stat-row">
-        <div class="stat-card">
-          <div class="stat-label">Total Alerts</div>
-          <div class="stat-value" id="stat-alerts">—</div>
-          <div class="stat-sub">since daemon start</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Active Files</div>
-          <div class="stat-value ok" id="stat-files">—</div>
-          <div class="stat-sub">being watched</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Rules</div>
-          <div class="stat-value" id="stat-rules">—</div>
-          <div class="stat-sub">active rules</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">PID</div>
-          <div class="stat-value" id="stat-pid">—</div>
-          <div class="stat-sub" id="stat-config">—</div>
-        </div>
-      </div>
-
-      <!-- Alert feed -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Live Alert Feed</span>
-        </div>
-        <div class="feed-controls">
-          <button class="filter-btn active" onclick="setFilter('ALL',this)">All</button>
-          <button class="filter-btn f-critical" onclick="setFilter('CRITICAL',this)">🔴 Critical</button>
-          <button class="filter-btn f-warn"     onclick="setFilter('WARN',this)">🟡 Warn</button>
-          <button class="filter-btn f-info"     onclick="setFilter('INFO',this)">🔵 Info</button>
-          <div class="feed-spacer"></div>
-          <span id="alert-count-badge">0 alerts</span>
-          <button class="pause-btn" id="pause-btn" onclick="togglePause()" title="Pause feed">⏸</button>
-        </div>
-        <div class="feed" id="alert-feed">
-          <div class="feed-empty">
-            <span class="icon">👁</span>
-            Watching for alerts...
-          </div>
-        </div>
-      </div>
+    <div class="section">
+      <div class="section-head">Rules <span class="section-badge" id="rules-badge">—</span></div>
+      <div id="rules-body"></div>
     </div>
 
-    <!-- ── Sidebar ────────────────────────────────────────────────── -->
-    <div class="sidebar">
-
-      <!-- Rules -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Rules</span>
-          <span id="rules-count" style="font-size:11px;color:var(--text-muted)">—</span>
-        </div>
-        <div class="rules-list" id="rules-list">
-          <div class="loading">Loading…</div>
-        </div>
-      </div>
-
-      <!-- Watched files -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Watched Files</span>
-          <span class="status-dot" style="background:var(--ok);box-shadow:0 0 5px var(--ok)"></span>
-        </div>
-        <div class="files-list" id="files-list">
-          <div class="loading">Loading…</div>
-        </div>
-      </div>
-
-      <!-- Config -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Config</span>
-        </div>
-        <div class="config-path" id="config-path">—</div>
-      </div>
-
+    <div class="section">
+      <div class="section-head">Watched Files</div>
+      <div id="files-body"></div>
     </div>
-  </div><!-- .main -->
-</div><!-- .app -->
+
+    <div class="section">
+      <div class="section-head">Daemon</div>
+      <div class="meta-row"><span class="meta-k">PID</span><span class="meta-v" id="m-pid">—</span></div>
+      <div class="meta-row"><span class="meta-k">Config</span><span class="meta-v" id="m-cfg" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span></div>
+    </div>
+
+  </div>
+</div>
 
 <script>
-  // ── State ────────────────────────────────────────────────────────
-  let alerts = [];
-  let filter = 'ALL';
-  let paused = false;
-  let totalAlertCount = 0;
-  const MAX_ALERTS = 500;
-  const ruleCounts = {};
+// ── state ──────────────────────────────────────────────────────────
+let alerts = [], filter = 'ALL', paused = false, total = 0;
+const ruleCounts = {}, MAX = 500;
 
-  // ── SSE: live alerts ─────────────────────────────────────────────
-  function connectSSE() {
-    const es = new EventSource('/api/events');
+// ── SSE ────────────────────────────────────────────────────────────
+function connectSSE() {
+  const es = new EventSource('/api/events');
+  es.onopen = () => setOnline(true);
+  es.addEventListener('alert', e => onAlert(JSON.parse(e.data)));
+  es.onerror = () => { setOnline(false); es.close(); setTimeout(connectSSE, 3000); };
+}
 
-    es.onopen = () => setOnline(true);
+function onAlert(a) {
+  total++;
+  ruleCounts[a.rule] = (ruleCounts[a.rule] || 0) + 1;
+  alerts.unshift(a);
+  if (alerts.length > MAX) alerts.pop();
+  updateStats();
+  updateRules();
+  if (!paused) renderFeed();
+}
 
-    es.addEventListener('alert', e => {
-      const alert = JSON.parse(e.data);
-      onAlert(alert);
-    });
+// ── status polling ─────────────────────────────────────────────────
+function pollStatus() {
+  fetch('/api/status').then(r => r.json()).then(s => {
+    setOnline(true);
+    document.getElementById('s-alerts').textContent = s.alert_count;
+    document.getElementById('s-files').textContent  = s.files?.length ?? 0;
+    document.getElementById('s-rules').textContent  = s.rule_count;
+    document.getElementById('s-uptime').textContent = s.uptime ?? '—';
+    document.getElementById('s-pid').textContent    = 'pid ' + s.pid;
+    document.getElementById('uptime').textContent   = s.uptime ?? '—';
+    document.getElementById('m-pid').textContent    = s.pid;
+    document.getElementById('m-cfg').textContent    = s.config_path ?? '—';
+    document.getElementById('m-cfg').title          = s.config_path ?? '';
+    document.getElementById('rules-badge').textContent = s.rule_count;
+    renderFiles(s.files ?? []);
+  }).catch(() => setOnline(false));
+}
 
-    es.onerror = () => {
-      setOnline(false);
-      es.close();
-      setTimeout(connectSSE, 3000); // reconnect
-    };
+// ── render feed ────────────────────────────────────────────────────
+function renderFeed() {
+  const el = document.getElementById('feed');
+  const list = filter === 'ALL' ? alerts : alerts.filter(a => a.severity === filter);
+  if (!list.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">👁</div><p>No ${filter==='ALL'?'':''+filter+' '}alerts yet…</p></div>`;
+    return;
+  }
+  el.innerHTML = list.map((a, i) => buildCard(a, i)).join('');
+}
+
+function buildCard(a, idx) {
+  const fmtClass = 'fmt-' + (a.format || 'plaintext');
+  const fmtLabel = (a.format || 'text').toUpperCase();
+
+  // Core detail rows
+  let detail = `
+    <div class="detail-grid">
+      <span class="dk">time</span>      <span class="dv">${esc(a.time)}</span>
+      <span class="dk">severity</span>  <span class="dv ${sevClass(a.severity)}">${esc(a.severity)}</span>
+      <span class="dk">level</span>     <span class="dv">${esc(a.level || '—')}</span>
+      <span class="dk">rule</span>      <span class="dv blue">${esc(a.rule)}</span>
+      <span class="dk">format</span>    <span class="dv">${fmtLabel}</span>
+      <span class="dk">source</span>    <span class="dv">${esc(a.source || '—')}</span>
+    </div>`;
+
+  // Extra parsed fields
+  const fields = a.fields && Object.keys(a.fields).length ? a.fields : null;
+  if (fields) {
+    detail += `<div class="fields-title">Parsed Fields</div>
+      <div class="fields-grid">` +
+      Object.entries(fields).map(([k,v]) =>
+        `<div class="field-chip"><span class="field-k">${esc(k)}</span><span class="field-v">${esc(v)}</span></div>`
+      ).join('') +
+    `</div>`;
   }
 
-  function onAlert(a) {
-    totalAlertCount++;
-    ruleCounts[a.rule] = (ruleCounts[a.rule] || 0) + 1;
-    alerts.unshift(a);
-    if (alerts.length > MAX_ALERTS) alerts.pop();
-
-    updateAlertBadge();
-    updateStatAlerts();
-    updateRuleCounts();
-
-    if (!paused) renderFeed();
+  // Raw line
+  if (a.raw && a.raw !== a.message) {
+    detail += `<div class="raw-block"><div class="raw-label">Raw Line</div><div class="raw-text">${esc(a.raw)}</div></div>`;
   }
 
-  // ── Status polling ───────────────────────────────────────────────
-  function pollStatus() {
-    fetch('/api/status')
-      .then(r => r.json())
-      .then(s => {
-        setOnline(true);
-        document.getElementById('stat-alerts').textContent  = s.alert_count;
-        document.getElementById('stat-files').textContent   = s.files ? s.files.length : 0;
-        document.getElementById('stat-rules').textContent   = s.rule_count;
-        document.getElementById('stat-pid').textContent     = s.pid;
-        document.getElementById('config-path').textContent  = s.config_path || '—';
-        document.getElementById('uptime-display').textContent = s.uptime || '—';
-
-        const cfgEl = document.getElementById('stat-config');
-        if (s.config_path) {
-          const parts = s.config_path.split('/');
-          cfgEl.textContent = parts[parts.length - 1];
-        }
-
-        renderFiles(s.files || []);
-        renderRules(s.rule_count);
-      })
-      .catch(() => setOnline(false));
-  }
-
-  // ── Render helpers ───────────────────────────────────────────────
-  function renderFeed() {
-    const feed = document.getElementById('alert-feed');
-    const visible = filter === 'ALL' ? alerts : alerts.filter(a => a.severity === filter);
-
-    if (visible.length === 0) {
-      feed.innerHTML = `<div class="feed-empty"><span class="icon">👁</span>No ${filter === 'ALL' ? '' : filter + ' '}alerts yet...</div>`;
-      return;
-    }
-
-    feed.innerHTML = visible.map(a => `
-      <div class="alert-item ${a.severity}">
-        <span class="severity-badge badge-${a.severity}">${a.severity}</span>
+  return `
+    <div class="alert-card ${a.severity}" id="card-${idx}">
+      <div class="alert-head" onclick="toggle(${idx})">
+        <span class="sev sev-${a.severity}">${a.severity}</span>
+        <span class="fmt ${fmtClass}">${fmtLabel}</span>
         <span class="rule-tag">${esc(a.rule)}</span>
         <span class="alert-msg">${esc(a.message)}</span>
         <span class="alert-time">${fmtTime(a.time)}</span>
+        <span class="chevron">›</span>
       </div>
-    `).join('');
-  }
+      <div class="alert-detail">${detail}</div>
+    </div>`;
+}
 
-  function renderFiles(files) {
-    const el = document.getElementById('files-list');
-    if (!files.length) {
-      el.innerHTML = '<div class="loading">No files configured</div>';
-      return;
-    }
-    el.innerHTML = files.map(f => `
-      <div class="file-row">
-        <span class="file-dot"></span>
-        <span class="file-path">${esc(f)}</span>
+function toggle(idx) {
+  const card = document.getElementById('card-' + idx);
+  if (card) card.classList.toggle('open');
+}
+
+// ── sidebar ─────────────────────────────────────────────────────────
+function renderFiles(files) {
+  const el = document.getElementById('files-body');
+  el.innerHTML = files.length
+    ? files.map(f => `<div class="file-row"><span class="file-led"></span><span class="file-path">${esc(f)}</span></div>`).join('')
+    : '<div style="padding:10px 16px;font-size:12px;color:var(--text-muted)">No files configured</div>';
+}
+
+function updateRules() {
+  const el = document.getElementById('rules-body');
+  const entries = Object.entries(ruleCounts).sort((a,b) => b[1]-a[1]);
+  if (!entries.length) { el.innerHTML = '<div style="padding:10px 16px;font-size:12px;color:var(--text-muted)">No alerts yet</div>'; return; }
+  el.innerHTML = entries.map(([name, n]) => `
+    <div class="rule-row">
+      <div class="rule-info">
+        <div class="rule-name">${esc(name)}</div>
       </div>
-    `).join('');
-  }
+      <span class="rule-n ${n>0?'hot':''}">${n}</span>
+    </div>`).join('');
+}
 
-  function renderRules(count) {
-    const el = document.getElementById('rules-list');
-    document.getElementById('rules-count').textContent = count + ' rules';
-    if (!count) {
-      el.innerHTML = '<div class="loading">No rules loaded</div>';
-      return;
-    }
-    // Derive rule list from alert history
-    const seen = new Set(alerts.map(a => a.rule));
-    if (!seen.size) {
-      el.innerHTML = '<div class="loading">No alerts fired yet</div>';
-      return;
-    }
-    el.innerHTML = [...seen].map(name => {
-      const n = ruleCounts[name] || 0;
-      return `
-        <div class="rule-row">
-          <div>
-            <div class="rule-name">${esc(name)}</div>
-          </div>
-          <div class="rule-count ${n > 0 ? 'has-alerts' : ''}">${n}</div>
-        </div>
-      `;
-    }).join('');
-  }
+// ── controls ────────────────────────────────────────────────────────
+function setFilter(f, btn) {
+  filter = f;
+  document.querySelectorAll('.filter').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  updateStats();
+  renderFeed();
+}
 
-  function updateRuleCounts() {
-    const el = document.getElementById('rules-list');
-    const rows = el.querySelectorAll('.rule-row');
-    if (!rows.length) renderRules(Object.keys(ruleCounts).length);
-    else {
-      rows.forEach(row => {
-        const name = row.querySelector('.rule-name')?.textContent;
-        const countEl = row.querySelector('.rule-count');
-        if (name && countEl) {
-          const n = ruleCounts[name] || 0;
-          countEl.textContent = n;
-          countEl.className = 'rule-count' + (n > 0 ? ' has-alerts' : '');
-        }
-      });
-    }
-  }
+function togglePause() {
+  paused = !paused;
+  const btn = document.getElementById('pause-btn');
+  btn.textContent = paused ? '▶' : '⏸';
+  btn.title = paused ? 'Resume' : 'Pause';
+  if (!paused) renderFeed();
+}
 
-  function updateAlertBadge() {
-    const visible = filter === 'ALL' ? alerts : alerts.filter(a => a.severity === filter);
-    document.getElementById('alert-count-badge').textContent =
-      visible.length + ' alert' + (visible.length !== 1 ? 's' : '');
-  }
+function clearFeed() {
+  alerts = []; total = 0;
+  Object.keys(ruleCounts).forEach(k => delete ruleCounts[k]);
+  updateStats(); updateRules(); renderFeed();
+}
 
-  function updateStatAlerts() {
-    document.getElementById('stat-alerts').textContent = totalAlertCount;
-    const el = document.getElementById('stat-alerts');
-    el.classList.toggle('critical', totalAlertCount > 0);
-  }
+// ── helpers ──────────────────────────────────────────────────────────
+function updateStats() {
+  const visible = filter === 'ALL' ? alerts : alerts.filter(a => a.severity === filter);
+  document.getElementById('count-lbl').textContent = visible.length + ' alert' + (visible.length !== 1 ? 's' : '');
+  document.getElementById('s-alerts').textContent = total;
+}
 
-  // ── Controls ─────────────────────────────────────────────────────
-  function setFilter(f, btn) {
-    filter = f;
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    updateAlertBadge();
-    renderFeed();
-  }
+function setOnline(on) {
+  const pill = document.getElementById('pill');
+  pill.className = 'pill' + (on ? '' : ' offline');
+  document.getElementById('pill-text').textContent = on ? 'running' : 'offline';
+}
 
-  function togglePause() {
-    paused = !paused;
-    const btn = document.getElementById('pause-btn');
-    btn.textContent = paused ? '▶' : '⏸';
-    btn.title = paused ? 'Resume feed' : 'Pause feed';
-    if (!paused) renderFeed();
-  }
+function sevClass(s) {
+  return s === 'CRITICAL' ? 'red' : s === 'WARN' ? 'amber' : 'blue';
+}
 
-  function clearFeed() {
-    alerts = [];
-    Object.keys(ruleCounts).forEach(k => delete ruleCounts[k]);
-    totalAlertCount = 0;
-    updateAlertBadge();
-    updateStatAlerts();
-    renderFeed();
-    renderRules(0);
-  }
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleTimeString('en-GB', { hour12: false });
+}
 
-  // ── Utilities ─────────────────────────────────────────────────────
-  function setOnline(online) {
-    const pill = document.getElementById('status-pill');
-    const text = document.getElementById('status-text');
-    pill.className = 'status-pill' + (online ? '' : ' offline');
-    text.textContent = online ? 'running' : 'offline';
-  }
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
-  function fmtTime(iso) {
-    const d = new Date(iso);
-    return d.toLocaleTimeString('en-GB', { hour12: false });
-  }
-
-  function esc(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
-
-  // ── Init ─────────────────────────────────────────────────────────
-  pollStatus();
-  setInterval(pollStatus, 10000);
-  connectSSE();
+// ── init ─────────────────────────────────────────────────────────────
+pollStatus();
+setInterval(pollStatus, 10000);
+connectSSE();
 </script>
 </body>
 </html>

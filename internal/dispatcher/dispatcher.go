@@ -29,6 +29,9 @@ func Dispatch(cfg *config.Config, alerts <-chan rules.Alert, stats *control.Stat
 			Level:    a.Entry.Level,
 			Source:   a.Entry.Source,
 			Message:  a.Entry.Message,
+			Format:   string(a.Entry.Format),
+			Raw:      a.Entry.Raw,
+			Fields:   a.Entry.Fields,
 		})
 
 		for _, action := range a.Actions {

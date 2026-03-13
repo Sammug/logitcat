@@ -35,10 +35,13 @@ type AckResponse struct {
 
 // TailEvent is a single streamed alert pushed to tail subscribers.
 type TailEvent struct {
-	Time     string `json:"time"`
-	Severity string `json:"severity"`
-	Rule     string `json:"rule"`
-	Level    string `json:"level"`
-	Source   string `json:"source"`
-	Message  string `json:"message"`
+	Time     string            `json:"time"`
+	Severity string            `json:"severity"`
+	Rule     string            `json:"rule"`
+	Level    string            `json:"level"`
+	Source   string            `json:"source"`
+	Message  string            `json:"message"`
+	Format   string            `json:"format"`
+	Raw      string            `json:"raw"`
+	Fields   map[string]string `json:"fields,omitempty"`
 }
