@@ -139,16 +139,26 @@ Alert Dispatcher
 
 ## Roadmap
 
+### ✅ Done
 - [x] Real-time file watching
-- [x] Regex rule matching
-- [x] Cooldown / deduplication
-- [x] Stdout + file + webhook outputs
-- [ ] Structured log parsing (JSON, syslog)
-- [ ] Daemonize (run as background service)
-- [ ] CLI control tool (`logwatch-ctl`)
-- [ ] Email alerts
-- [ ] Log rotation handling
-- [ ] Web dashboard
+- [x] Regex rule matching with cooldown / deduplication
+- [x] Structured log parsing — JSON, syslog, Apache/Nginx, plaintext
+- [x] Log rotation handling (rename + copytruncate)
+- [x] Daemon + CLI control tool (`start` / `stop` / `status` / `tail` / `reload`)
+- [x] Alert outputs — stdout, file, Slack webhook, Microsoft Teams, email (SMTP)
+- [x] Web dashboard — live alert feed, expandable cards, parsed fields, copy buttons
+- [x] Unit tests — parser, rules engine, config
+
+### 🔜 Planned
+- [ ] **stdin / pipe support** — `adb logcat | logwatch watch --stdin` for IDE integration
+- [ ] **IDE plugins** — IntelliJ / Android Studio panel, VS Code extension
+- [ ] **Named pipe support** — watch `mkfifo` pipes like regular files
+- [ ] **Log rotation** — hot-reload config on SIGHUP (reload without restart)
+- [ ] **Anomaly detection** — alert on spike in error rate, not just pattern match
+- [ ] **On-call schedules** — route alerts to different people by time of day
+- [ ] **Mobile push notifications** — iOS / Android alert delivery
+- [ ] **Multi-server** — aggregate logs from multiple machines into one dashboard
+- [ ] **logwatch Cloud** — hosted SaaS version, no server required
 
 ---
 
