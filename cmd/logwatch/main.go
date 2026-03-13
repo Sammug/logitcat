@@ -99,7 +99,7 @@ func cmdStatus() {
 
 func cmdTail() {
 	client := control.NewClient(daemon.SocketPath())
-	fmt.Println("Streaming alerts (Ctrl+C to stop)...\n")
+	fmt.Println("Streaming alerts (Ctrl+C to stop)...")
 	err := client.Tail(func(e control.TailEvent) bool {
 		fmt.Printf("[%s] [%-8s] [%s] %s\n", e.Time, e.Severity, e.Rule, e.Message)
 		return true
