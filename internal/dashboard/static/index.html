@@ -197,6 +197,17 @@
       padding: 8px 12px; font-family: var(--mono); font-size: 11px; color: var(--text-dim);
       word-break: break-all; white-space: pre-wrap; line-height: 1.6;
     }
+    .copy-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .copy-val { font-family: var(--mono); font-size: 11px; color: var(--text-dim); word-break: break-all; flex: 1; }
+    .copy-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;
+      cursor: pointer; border: 1px solid var(--border);
+      background: var(--surface2); color: var(--text-muted);
+      transition: all .15s; white-space: nowrap; flex-shrink: 0;
+    }
+    .copy-btn:hover { background: var(--surface3); color: var(--text); border-color: var(--border2); }
+    .copy-btn.copied { background: var(--ok-bg); color: var(--ok); border-color: rgba(63,185,80,.4); }
 
     /* ── Empty state ── */
     .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
@@ -356,7 +367,13 @@ function buildCard(a, idx) {
       <span class="dk">level</span>     <span class="dv">${esc(a.level || '—')}</span>
       <span class="dk">rule</span>      <span class="dv blue">${esc(a.rule)}</span>
       <span class="dk">format</span>    <span class="dv">${fmtLabel}</span>
-      <span class="dk">source</span>    <span class="dv">${esc(a.source || '—')}</span>
+      <span class="dk">source</span>
+      <span class="dv">
+        <span class="copy-row">
+          <span class="copy-val">${esc(a.source || '—')}</span>
+          ${a.source ? `<button class="copy-btn" onclick="copyText(this,'${esc(a.source)}')">📋 Copy</button>` : ''}
+        </span>
+      </span>
     </div>`;
 
   // Extra parsed fields
@@ -371,8 +388,15 @@ function buildCard(a, idx) {
   }
 
   // Raw line
-  if (a.raw && a.raw !== a.message) {
-    detail += `<div class="raw-block"><div class="raw-label">Raw Line</div><div class="raw-text">${esc(a.raw)}</div></div>`;
+  if (a.raw) {
+    detail += `
+      <div class="raw-block">
+        <div class="copy-row" style="margin-bottom:6px">
+          <span class="raw-label" style="margin:0">Raw Line</span>
+          <button class="copy-btn" onclick="copyText(this,${JSON.stringify(a.raw)})">📋 Copy</button>
+        </div>
+        <div class="raw-text">${esc(a.raw)}</div>
+      </div>`;
   }
 
   return `
@@ -462,6 +486,30 @@ function fmtTime(iso) {
 
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function copyText(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✅ Copied';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '📋 Copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(() => {
+    // Fallback for older browsers
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.textContent = '✅ Copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '📋 Copy'; btn.classList.remove('copied'); }, 2000);
+  });
 }
 
 // ── init ─────────────────────────────────────────────────────────────
