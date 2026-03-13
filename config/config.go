@@ -1,3 +1,4 @@
+// Package config loads and validates logwatch configuration from an INI file.
 package config
 
 import (
@@ -6,14 +7,18 @@ import (
 	"gopkg.in/ini.v1"
 )
 
+// Rule describes a single alert rule.
 type Rule struct {
-	Name     string
-	Pattern  string
-	Severity string
-	Action   []string
-	Cooldown int // seconds
+	Name     string   // unique rule identifier
+	Pattern  string   // regex to match against the target field
+	Field    string   // log field to match against (default: message)
+	Level    string   // minimum log level to consider (default: all)
+	Severity string   // alert severity: INFO | WARN | CRITICAL
+	Action   []string // output targets: stdout | file | webhook
+	Cooldown int      // minimum seconds between repeat alerts (0 = no limit)
 }
 
+// Config is the validated runtime configuration.
 type Config struct {
 	Files      []string
 	Rules      []Rule
@@ -21,50 +26,55 @@ type Config struct {
 	AlertFile  string
 }
 
+// Load reads and validates the INI file at path.
 func Load(path string) (*Config, error) {
-	cfg, err := ini.Load(path)
+	f, err := ini.Load(path)
 	if err != nil {
 		return nil, err
 	}
 
 	c := &Config{}
 
-	// [watch] section
-	if sec, err := cfg.GetSection("watch"); err == nil {
-		files := sec.Key("files").String()
-		for _, f := range strings.Split(files, ",") {
-			f = strings.TrimSpace(f)
-			if f != "" {
-				c.Files = append(c.Files, f)
+	if sec, err := f.GetSection("watch"); err == nil {
+		for _, raw := range strings.Split(sec.Key("files").String(), ",") {
+			if p := strings.TrimSpace(raw); p != "" {
+				c.Files = append(c.Files, p)
 			}
 		}
 	}
 
-	// [output] section
-	if sec, err := cfg.GetSection("output"); err == nil {
+	if sec, err := f.GetSection("output"); err == nil {
 		c.WebhookURL = sec.Key("webhook_url").String()
 		c.AlertFile = sec.Key("alert_file").String()
 	}
 
-	// [rule:*] sections
-	for _, sec := range cfg.Sections() {
+	for _, sec := range f.Sections() {
 		if !strings.HasPrefix(sec.Name(), "rule:") {
 			continue
 		}
-		name := strings.TrimPrefix(sec.Name(), "rule:")
-		actions := strings.Split(sec.Key("action").String(), ",")
-		for i := range actions {
-			actions[i] = strings.TrimSpace(actions[i])
-		}
-		rule := Rule{
-			Name:     name,
+
+		actions := splitTrim(sec.Key("action").String(), ",")
+		c.Rules = append(c.Rules, Rule{
+			Name:     strings.TrimPrefix(sec.Name(), "rule:"),
 			Pattern:  sec.Key("pattern").String(),
+			Field:    sec.Key("field").MustString(""),
+			Level:    sec.Key("level").MustString(""),
 			Severity: sec.Key("severity").MustString("INFO"),
 			Action:   actions,
 			Cooldown: sec.Key("cooldown").MustInt(0),
-		}
-		c.Rules = append(c.Rules, rule)
+		})
 	}
 
 	return c, nil
+}
+
+func splitTrim(s, sep string) []string {
+	parts := strings.Split(s, sep)
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if v := strings.TrimSpace(p); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }

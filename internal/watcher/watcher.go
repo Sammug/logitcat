@@ -1,3 +1,4 @@
+// Package watcher tails one or more log files and emits new lines as they arrive.
 package watcher
 
 import (
@@ -8,63 +9,58 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/sammug/logwatch/internal/parser"
 )
 
-// Watch tails multiple log files and sends new lines to the lines channel.
-func Watch(files []string, lines chan<- string) {
+// Watch starts a goroutine per file and forwards new lines to out.
+// It also runs the fsnotify event loop to detect log rotation.
+func Watch(files []string, out chan<- parser.RawLine) {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatalf("watcher: failed to create: %v", err)
+		log.Fatalf("watcher: %v", err)
 	}
-	defer w.Close()
 
 	for _, f := range files {
 		if err := w.Add(f); err != nil {
-			log.Printf("watcher: cannot watch %s: %v", f, err)
+			log.Printf("watcher: cannot watch %q: %v", f, err)
 			continue
 		}
-		go tailFile(f, lines)
-		log.Printf("watcher: watching %s", f)
+		go tailFile(f, out)
+		log.Printf("watcher: tailing %s", f)
 	}
 
-	for {
-		select {
-		case event, ok := <-w.Events:
-			if !ok {
-				return
-			}
-			if event.Has(fsnotify.Write) {
-				// handled by tailFile goroutine
-				_ = event
-			}
-		case err, ok := <-w.Errors:
-			if !ok {
-				return
-			}
-			log.Printf("watcher error: %v", err)
+	// Drain fsnotify events; rotation detection can be added here later.
+	go func() {
+		defer w.Close()
+		for err := range w.Errors {
+			log.Printf("watcher: %v", err)
 		}
-	}
+	}()
 }
 
-// tailFile reads new lines appended to a file (like `tail -f`).
-func tailFile(path string, lines chan<- string) {
+// tailFile seeks to the end of path and streams every new line to out.
+func tailFile(path string, out chan<- parser.RawLine) {
 	f, err := os.Open(path)
 	if err != nil {
-		log.Printf("tailFile: cannot open %s: %v", path, err)
+		log.Printf("tailFile: cannot open %q: %v", path, err)
 		return
 	}
 	defer f.Close()
 
-	// Seek to end so we only catch new lines
-	f.Seek(0, io.SeekEnd)
+	if _, err := f.Seek(0, io.SeekEnd); err != nil {
+		log.Printf("tailFile: seek failed for %q: %v", path, err)
+		return
+	}
 
-	reader := bufio.NewReader(f)
+	r := bufio.NewReader(f)
 	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			time.Sleep(200 * time.Millisecond)
-			continue
+		line, err := r.ReadString('\n')
+		if len(line) > 0 {
+			out <- parser.RawLine{Source: path, Line: line}
 		}
-		lines <- line
+		if err != nil {
+			// No new data yet — back off briefly before retrying.
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
 }

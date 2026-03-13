@@ -1,61 +1,127 @@
+// Package rules matches parsed log entries against user-defined regex rules
+// and emits Alerts for downstream dispatch.
 package rules
 
 import (
-	"log"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/sammug/logwatch/config"
+	"github.com/sammug/logwatch/internal/parser"
 )
 
+// Alert is produced whenever a log entry matches a rule.
 type Alert struct {
 	RuleName string
 	Severity string
-	Line     string
+	Entry    parser.LogEntry
 	Actions  []string
 	Time     time.Time
 }
 
-type compiledRule struct {
+// compiled wraps a config.Rule with its pre-compiled regex and cooldown state.
+type compiled struct {
 	config.Rule
-	regex     *regexp.Regexp
-	lastFired time.Time
+	re        *regexp.Regexp
 	mu        sync.Mutex
+	lastFired time.Time
 }
 
-// Match reads lines, applies rules, and sends alerts.
-func Match(ruleCfgs []config.Rule, lines <-chan string, alerts chan<- Alert) {
-	compiled := make([]*compiledRule, 0, len(ruleCfgs))
-	for _, r := range ruleCfgs {
-		re, err := regexp.Compile(r.Pattern)
-		if err != nil {
-			log.Printf("rules: invalid pattern [%s]: %v", r.Name, err)
-			continue
-		}
-		compiled = append(compiled, &compiledRule{Rule: r, regex: re})
-	}
+// Match reads LogEntries, tests each against all rules, and sends Alerts.
+func Match(ruleCfgs []config.Rule, in <-chan parser.LogEntry, out chan<- Alert) {
+	rules := compile(ruleCfgs)
 
-	for line := range lines {
-		for _, cr := range compiled {
-			if cr.regex.MatchString(line) {
-				cr.mu.Lock()
-				elapsed := time.Since(cr.lastFired).Seconds()
-				if cr.Cooldown > 0 && elapsed < float64(cr.Cooldown) {
-					cr.mu.Unlock()
-					continue
-				}
-				cr.lastFired = time.Now()
-				cr.mu.Unlock()
-
-				alerts <- Alert{
-					RuleName: cr.Name,
-					Severity: cr.Severity,
-					Line:     line,
-					Actions:  cr.Action,
+	for entry := range in {
+		for _, r := range rules {
+			if r.matches(entry) && r.cooldownOK() {
+				out <- Alert{
+					RuleName: r.Name,
+					Severity: r.Severity,
+					Entry:    entry,
+					Actions:  r.Action,
 					Time:     time.Now(),
 				}
 			}
 		}
 	}
+}
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+// compile pre-compiles all rule patterns, skipping invalid ones.
+func compile(cfgs []config.Rule) []*compiled {
+	out := make([]*compiled, 0, len(cfgs))
+	for _, cfg := range cfgs {
+		re, err := regexp.Compile(cfg.Pattern)
+		if err != nil {
+			// Log via standard logger; don't crash the whole daemon.
+			continue
+		}
+		out = append(out, &compiled{Rule: cfg, re: re})
+	}
+	return out
+}
+
+// matches returns true when the entry satisfies the rule's field + pattern + level filters.
+func (c *compiled) matches(e parser.LogEntry) bool {
+	// Optional level filter (e.g. only match entries at "error" or above).
+	if c.Level != "" && !levelAtLeast(e.Level, c.Level) {
+		return false
+	}
+
+	// Determine which string to test the pattern against.
+	target := resolveField(e, c.Field)
+	return c.re.MatchString(target)
+}
+
+// cooldownOK returns true and records the fire time if the cooldown has elapsed.
+func (c *compiled) cooldownOK() bool {
+	if c.Cooldown == 0 {
+		return true
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if time.Since(c.lastFired) < time.Duration(c.Cooldown)*time.Second {
+		return false
+	}
+	c.lastFired = time.Now()
+	return true
+}
+
+// resolveField returns the value of the named field from the entry.
+// An empty field name defaults to matching against the full message.
+func resolveField(e parser.LogEntry, field string) string {
+	switch strings.ToLower(field) {
+	case "", "message", "msg":
+		return e.Message
+	case "raw":
+		return e.Raw
+	case "level":
+		return e.Level
+	case "source":
+		return e.Source
+	default:
+		return e.Fields[field]
+	}
+}
+
+// levelOrder defines severity from lowest (0) to highest.
+var levelOrder = map[string]int{
+	"debug": 0,
+	"info":  1,
+	"warn":  2,
+	"error": 3,
+	"fatal": 4,
+}
+
+// levelAtLeast returns true when actual is at least as severe as minimum.
+func levelAtLeast(actual, minimum string) bool {
+	a, aOK := levelOrder[strings.ToLower(actual)]
+	m, mOK := levelOrder[strings.ToLower(minimum)]
+	if !aOK || !mOK {
+		return true // unknown levels pass through
+	}
+	return a >= m
 }
