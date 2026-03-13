@@ -41,6 +41,8 @@ func Dispatch(cfg *config.Config, alerts <-chan rules.Alert, stats *control.Stat
 				sendWebhook(cfg.WebhookURL, a)
 			case "teams":
 				sendTeams(cfg.TeamsWebhookURL, a)
+			case "email":
+				sendEmail(cfg, a)
 			default:
 				log.Printf("dispatcher: unknown action %q in rule %q", action, a.RuleName)
 			}

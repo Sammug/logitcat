@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -164,6 +165,61 @@ action  = stdout
 	}
 	if len(cfg.Files) != 0 {
 		t.Errorf("expected 0 files, got %v", cfg.Files)
+	}
+}
+
+func TestLoadSMTPConfig(t *testing.T) {
+	path := writeTemp(t, `
+[watch]
+files = /tmp/test.log
+
+[output]
+smtp_host     = smtp.gmail.com
+smtp_port     = 587
+smtp_user     = alerts@example.com
+smtp_password = secret
+smtp_from     = logwatch <alerts@example.com>
+smtp_to       = admin@example.com, ops@example.com
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	s := cfg.SMTP
+	if s.Host != "smtp.gmail.com" {
+		t.Errorf("Host = %q", s.Host)
+	}
+	if s.Port != 587 {
+		t.Errorf("Port = %d, want 587", s.Port)
+	}
+	if s.User != "alerts@example.com" {
+		t.Errorf("User = %q", s.User)
+	}
+	if s.Password != "secret" {
+		t.Errorf("Password = %q", s.Password)
+	}
+	if len(s.To) != 2 {
+		t.Errorf("To = %v, want 2 recipients", s.To)
+	}
+}
+
+func TestLoadSMTPDefaults(t *testing.T) {
+	path := writeTemp(t, `
+[watch]
+files = /tmp/test.log
+
+[output]
+smtp_host = smtp.example.com
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.SMTP.Port != 587 {
+		t.Errorf("default Port = %d, want 587", cfg.SMTP.Port)
+	}
+	if !strings.Contains(cfg.SMTP.From, "logwatch") {
+		t.Errorf("default From = %q, want logwatch in it", cfg.SMTP.From)
 	}
 }
 

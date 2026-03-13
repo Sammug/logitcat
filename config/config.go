@@ -14,8 +14,18 @@ type Rule struct {
 	Field    string   // log field to match against (default: message)
 	Level    string   // minimum log level to consider (default: all)
 	Severity string   // alert severity: INFO | WARN | CRITICAL
-	Action   []string // output targets: stdout | file | webhook | teams
+	Action   []string // output targets: stdout | file | webhook | teams | email
 	Cooldown int      // minimum seconds between repeat alerts (0 = no limit)
+}
+
+// SMTPConfig holds email delivery settings.
+type SMTPConfig struct {
+	Host     string
+	Port     int      // 587 = STARTTLS (default), 465 = TLS, 25 = plain
+	User     string
+	Password string
+	From     string
+	To       []string
 }
 
 // Config is the validated runtime configuration.
@@ -25,6 +35,7 @@ type Config struct {
 	WebhookURL      string // Slack-compatible webhook URL
 	TeamsWebhookURL string // Microsoft Teams incoming webhook URL
 	AlertFile       string // path to write alert log
+	SMTP            SMTPConfig
 }
 
 // Load reads and validates the INI file at path.
@@ -48,6 +59,14 @@ func Load(path string) (*Config, error) {
 		c.WebhookURL      = sec.Key("webhook_url").String()
 		c.TeamsWebhookURL = sec.Key("teams_webhook_url").String()
 		c.AlertFile       = sec.Key("alert_file").String()
+		c.SMTP = SMTPConfig{
+			Host:     sec.Key("smtp_host").String(),
+			Port:     sec.Key("smtp_port").MustInt(587),
+			User:     sec.Key("smtp_user").String(),
+			Password: sec.Key("smtp_password").String(),
+			From:     sec.Key("smtp_from").MustString("logwatch <noreply@logwatch>"),
+			To:       splitTrim(sec.Key("smtp_to").String(), ","),
+		}
 	}
 
 	for _, sec := range f.Sections() {
