@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+
 // Stats holds live daemon metrics updated atomically by the pipeline.
 type Stats struct {
 	StartTime  time.Time
@@ -20,8 +21,9 @@ type Stats struct {
 	alerts     atomic.Int64
 }
 
-func (s *Stats) IncAlerts()       { s.alerts.Add(1) }
+func (s *Stats) IncAlerts()        { s.alerts.Add(1) }
 func (s *Stats) AlertCount() int64 { return s.alerts.Load() }
+func (s *Stats) PID() int          { return os.Getpid() }
 
 // Server listens on the UNIX socket and handles CLI commands.
 type Server struct {

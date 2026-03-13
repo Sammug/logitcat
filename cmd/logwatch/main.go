@@ -11,6 +11,7 @@ import (
 	"github.com/sammug/logwatch/config"
 	"github.com/sammug/logwatch/internal/control"
 	"github.com/sammug/logwatch/internal/daemon"
+	"github.com/sammug/logwatch/internal/dashboard"
 	"github.com/sammug/logwatch/internal/dispatcher"
 	"github.com/sammug/logwatch/internal/parser"
 	"github.com/sammug/logwatch/internal/rules"
@@ -172,8 +173,21 @@ func cmdRun(isDaemon bool) {
 	go rules.Match(cfg.Rules, entries, alerts)
 	go dispatcher.Dispatch(cfg, alerts, stats, broker)
 
+	// Dashboard (optional)
+	if cfg.DashboardAddr != "" {
+		dash := dashboard.NewServer(cfg.DashboardAddr, stats, broker)
+		go func() {
+			if err := dash.Listen(); err != nil {
+				log.Printf("dashboard: %v", err)
+			}
+		}()
+	}
+
 	log.Printf("logwatch started — watching %d file(s), %d rule(s) active",
 		len(cfg.Files), len(cfg.Rules))
+	if cfg.DashboardAddr != "" {
+		log.Printf("dashboard: http://localhost%s", cfg.DashboardAddr)
+	}
 
 	// Shutdown on SIGINT / SIGTERM or stop command
 	sig := make(chan os.Signal, 1)

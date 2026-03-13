@@ -36,6 +36,7 @@ type Config struct {
 	TeamsWebhookURL string // Microsoft Teams incoming webhook URL
 	AlertFile       string // path to write alert log
 	SMTP            SMTPConfig
+	DashboardAddr   string // dashboard HTTP address (e.g. ":9090"), empty = disabled
 }
 
 // Load reads and validates the INI file at path.
@@ -59,6 +60,7 @@ func Load(path string) (*Config, error) {
 		c.WebhookURL      = sec.Key("webhook_url").String()
 		c.TeamsWebhookURL = sec.Key("teams_webhook_url").String()
 		c.AlertFile       = sec.Key("alert_file").String()
+		c.DashboardAddr   = sec.Key("dashboard_addr").MustString(":9090")
 		c.SMTP = SMTPConfig{
 			Host:     sec.Key("smtp_host").String(),
 			Port:     sec.Key("smtp_port").MustInt(587),
