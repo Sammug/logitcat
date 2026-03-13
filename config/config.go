@@ -14,16 +14,17 @@ type Rule struct {
 	Field    string   // log field to match against (default: message)
 	Level    string   // minimum log level to consider (default: all)
 	Severity string   // alert severity: INFO | WARN | CRITICAL
-	Action   []string // output targets: stdout | file | webhook
+	Action   []string // output targets: stdout | file | webhook | teams
 	Cooldown int      // minimum seconds between repeat alerts (0 = no limit)
 }
 
 // Config is the validated runtime configuration.
 type Config struct {
-	Files      []string
-	Rules      []Rule
-	WebhookURL string
-	AlertFile  string
+	Files           []string
+	Rules           []Rule
+	WebhookURL      string // Slack-compatible webhook URL
+	TeamsWebhookURL string // Microsoft Teams incoming webhook URL
+	AlertFile       string // path to write alert log
 }
 
 // Load reads and validates the INI file at path.
@@ -44,23 +45,22 @@ func Load(path string) (*Config, error) {
 	}
 
 	if sec, err := f.GetSection("output"); err == nil {
-		c.WebhookURL = sec.Key("webhook_url").String()
-		c.AlertFile = sec.Key("alert_file").String()
+		c.WebhookURL      = sec.Key("webhook_url").String()
+		c.TeamsWebhookURL = sec.Key("teams_webhook_url").String()
+		c.AlertFile       = sec.Key("alert_file").String()
 	}
 
 	for _, sec := range f.Sections() {
 		if !strings.HasPrefix(sec.Name(), "rule:") {
 			continue
 		}
-
-		actions := splitTrim(sec.Key("action").String(), ",")
 		c.Rules = append(c.Rules, Rule{
 			Name:     strings.TrimPrefix(sec.Name(), "rule:"),
 			Pattern:  sec.Key("pattern").String(),
 			Field:    sec.Key("field").MustString(""),
 			Level:    sec.Key("level").MustString(""),
 			Severity: sec.Key("severity").MustString("INFO"),
-			Action:   actions,
+			Action:   splitTrim(sec.Key("action").String(), ","),
 			Cooldown: sec.Key("cooldown").MustInt(0),
 		})
 	}
