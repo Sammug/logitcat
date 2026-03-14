@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sammug/logwatch/config"
-	"github.com/sammug/logwatch/internal/rules"
+	"github.com/sammug/logitcat/config"
+	"github.com/sammug/logitcat/internal/rules"
 )
 
 // sendEmail sends an alert via SMTP.
@@ -27,7 +27,7 @@ func sendEmail(cfg *config.Config, a rules.Alert) {
 		return
 	}
 
-	subject := fmt.Sprintf("[logwatch] [%s] %s triggered", a.Severity, a.RuleName)
+	subject := fmt.Sprintf("[logitcat] [%s] %s triggered", a.Severity, a.RuleName)
 	html, err := renderEmailHTML(a)
 	if err != nil {
 		log.Printf("dispatcher: email template: %v", err)
@@ -110,7 +110,7 @@ func deliverSMTP(c *smtp.Client, sc config.SMTPConfig, msg []byte) error {
 
 // buildMIME creates a multipart/alternative MIME email (plain + HTML).
 func buildMIME(from string, to []string, subject, plain, html string) []byte {
-	boundary := "logwatch-mime-boundary"
+	boundary := "logitcat-mime-boundary"
 	var b bytes.Buffer
 
 	fmt.Fprintf(&b, "From: %s\r\n", from)
@@ -157,7 +157,7 @@ var emailHTMLTmpl = template.Must(template.New("email").Parse(`<!DOCTYPE html>
 <body>
 <div class="wrap">
   <div class="hdr">
-    <h2>{{.Icon}} logwatch alert</h2>
+    <h2>{{.Icon}} logitcat alert</h2>
     <p>{{.RuleName}} — {{.Severity}}</p>
   </div>
   <div class="body">
@@ -171,7 +171,7 @@ var emailHTMLTmpl = template.Must(template.New("email").Parse(`<!DOCTYPE html>
     </table>
     <div class="msg">{{.Message}}</div>
   </div>
-  <div class="foot">Sent by logwatch &bull; {{.Time}}</div>
+  <div class="foot">Sent by logitcat &bull; {{.Time}}</div>
 </div>
 </body>
 </html>`))
@@ -209,7 +209,7 @@ func renderEmailHTML(a rules.Alert) (string, error) {
 
 func renderEmailPlain(a rules.Alert) string {
 	return fmt.Sprintf(
-		"logwatch alert\n\nRule:     %s\nSeverity: %s\nLevel:    %s\nSource:   %s\nTime:     %s\n\nMessage:\n%s\n",
+		"logitcat alert\n\nRule:     %s\nSeverity: %s\nLevel:    %s\nSource:   %s\nTime:     %s\n\nMessage:\n%s\n",
 		a.RuleName, a.Severity, a.Entry.Level,
 		a.Entry.Source, a.Time.Format(time.RFC1123),
 		a.Entry.Message,

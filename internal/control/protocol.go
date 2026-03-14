@@ -1,4 +1,4 @@
-// Package control defines the IPC protocol between the logwatch daemon and CLI.
+// Package control defines the IPC protocol between the logitcat daemon and CLI.
 // Communication happens over a UNIX domain socket using newline-delimited JSON.
 package control
 

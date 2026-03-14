@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sammug/logwatch/internal/rules"
+	"github.com/sammug/logitcat/internal/rules"
 )
 
 // sendTeams posts an Adaptive Card to a Microsoft Teams Incoming Webhook.
@@ -64,7 +64,7 @@ func teamsPayload(a rules.Alert) map[string]any {
 									"items": []map[string]any{
 										{
 											"type":   "TextBlock",
-											"text":   fmt.Sprintf("%s  **logwatch alert**", icon),
+											"text":   fmt.Sprintf("%s  **logitcat alert**", icon),
 											"size":   "medium",
 											"weight": "bolder",
 											"color":  "light",

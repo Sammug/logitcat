@@ -8,32 +8,32 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sammug/logwatch/config"
-	"github.com/sammug/logwatch/internal/control"
-	"github.com/sammug/logwatch/internal/daemon"
-	"github.com/sammug/logwatch/internal/dashboard"
-	"github.com/sammug/logwatch/internal/dispatcher"
-	"github.com/sammug/logwatch/internal/parser"
-	"github.com/sammug/logwatch/internal/rules"
-	"github.com/sammug/logwatch/internal/watcher"
+	"github.com/sammug/logitcat/config"
+	"github.com/sammug/logitcat/internal/control"
+	"github.com/sammug/logitcat/internal/daemon"
+	"github.com/sammug/logitcat/internal/dashboard"
+	"github.com/sammug/logitcat/internal/dispatcher"
+	"github.com/sammug/logitcat/internal/parser"
+	"github.com/sammug/logitcat/internal/rules"
+	"github.com/sammug/logitcat/internal/watcher"
 )
 
-const usage = `logwatch — lightweight log parser and alerting engine
+const usage = `logitcat — lightweight log parser and alerting engine
 
 Usage:
-  logwatch start  <config.ini>             start daemon in the background
-  logwatch stop                            stop the running daemon
-  logwatch status                          show daemon health and metrics
-  logwatch tail                            stream live alerts from the daemon
-  logwatch reload                          hot-reload the daemon's config
-  logwatch run    <config.ini>             run in the foreground (dev mode)
-  logwatch pipe   <config.ini> [--source <name>] [--dashboard]
+  logitcat start  <config.ini>             start daemon in the background
+  logitcat stop                            stop the running daemon
+  logitcat status                          show daemon health and metrics
+  logitcat tail                            stream live alerts from the daemon
+  logitcat reload                          hot-reload the daemon's config
+  logitcat run    <config.ini>             run in the foreground (dev mode)
+  logitcat pipe   <config.ini> [--source <name>] [--dashboard]
                                            read from stdin, apply rules, alert
 
 Examples:
-  adb logcat | logwatch pipe android.ini --source adb-logcat --dashboard
-  gradle build 2>&1 | logwatch pipe gradle.ini
-  tail -f app.log   | logwatch pipe rules.ini --source myapp
+  adb logcat | logitcat pipe android.ini --source adb-logcat --dashboard
+  gradle build 2>&1 | logitcat pipe gradle.ini
+  tail -f app.log   | logitcat pipe rules.ini --source myapp
 `
 
 func main() {
@@ -69,10 +69,10 @@ func main() {
 
 func cmdStart() {
 	if len(os.Args) < 3 {
-		fatalf("usage: logwatch start <config.ini>")
+		fatalf("usage: logitcat start <config.ini>")
 	}
 	if running, pid := daemon.IsRunning(); running {
-		fatalf("logwatch is already running (PID %d)", pid)
+		fatalf("logitcat is already running (PID %d)", pid)
 	}
 	// Re-launch self with --daemon flag so the child runs the actual pipeline.
 	if err := daemon.Start([]string{"--daemon", os.Args[2]}); err != nil {
@@ -84,19 +84,19 @@ func cmdStop() {
 	client := control.NewClient(daemon.SocketPath())
 	resp, err := client.Stop()
 	if err != nil {
-		fatalf("logwatch is not running or unreachable: %v", err)
+		fatalf("logitcat is not running or unreachable: %v", err)
 	}
-	fmt.Println("logwatch stopped:", resp.Message)
+	fmt.Println("logitcat stopped:", resp.Message)
 }
 
 func cmdStatus() {
 	client := control.NewClient(daemon.SocketPath())
 	s, err := client.Status()
 	if err != nil {
-		fmt.Println("● logwatch is not running")
+		fmt.Println("● logitcat is not running")
 		os.Exit(1)
 	}
-	fmt.Printf("● logwatch is running (PID %d)\n", s.PID)
+	fmt.Printf("● logitcat is running (PID %d)\n", s.PID)
 	fmt.Printf("  Uptime:    %s\n", s.Uptime)
 	fmt.Printf("  Config:    %s\n", s.ConfigPath)
 	fmt.Printf("  Watching:  %d file(s)\n", len(s.Files))
@@ -125,7 +125,7 @@ func cmdReload() {
 	if err != nil {
 		fatalf("reload failed: %v", err)
 	}
-	fmt.Println("logwatch:", resp.Message)
+	fmt.Println("logitcat:", resp.Message)
 }
 
 // cmdPipe reads log lines from stdin, parses and matches them, then dispatches alerts.
@@ -133,7 +133,7 @@ func cmdReload() {
 //        --dashboard      also start the web dashboard
 func cmdPipe() {
 	if len(os.Args) < 3 {
-		fatalf("usage: logwatch pipe <config.ini> [--source <name>] [--dashboard]")
+		fatalf("usage: logitcat pipe <config.ini> [--source <name>] [--dashboard]")
 	}
 	configPath := os.Args[2]
 
@@ -192,7 +192,7 @@ func cmdPipe() {
 		log.Printf("dashboard: http://localhost%s", cfg.DashboardAddr)
 	}
 
-	log.Printf("logwatch pipe: reading stdin as %q — %d rule(s) active", source, len(cfg.Rules))
+	log.Printf("logitcat pipe: reading stdin as %q — %d rule(s) active", source, len(cfg.Rules))
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -201,16 +201,16 @@ func cmdPipe() {
 	case <-stdinDone:
 		// Give pipeline a moment to drain then exit cleanly
 		time.Sleep(200 * time.Millisecond)
-		log.Printf("logwatch pipe: done. %d alert(s) fired.", stats.AlertCount())
+		log.Printf("logitcat pipe: done. %d alert(s) fired.", stats.AlertCount())
 	case <-quit:
-		log.Println("logwatch pipe: interrupted.")
+		log.Println("logitcat pipe: interrupted.")
 	}
 }
 
 // cmdRun starts the full pipeline — either in foreground (dev) or as the daemon process.
 func cmdRun(isDaemon bool) {
 	if len(os.Args) < 3 {
-		fatalf("usage: logwatch run <config.ini>")
+		fatalf("usage: logitcat run <config.ini>")
 	}
 	configPath := os.Args[2]
 
@@ -271,7 +271,7 @@ func cmdRun(isDaemon bool) {
 		}()
 	}
 
-	log.Printf("logwatch started — watching %d file(s), %d rule(s) active",
+	log.Printf("logitcat started — watching %d file(s), %d rule(s) active",
 		len(cfg.Files), len(cfg.Rules))
 	if cfg.DashboardAddr != "" {
 		log.Printf("dashboard: http://localhost%s", cfg.DashboardAddr)
@@ -286,7 +286,7 @@ func cmdRun(isDaemon bool) {
 	case <-quit:
 	}
 
-	log.Println("logwatch stopped.")
+	log.Println("logitcat stopped.")
 	srv.Close()
 }
 

@@ -1,4 +1,4 @@
-module github.com/sammug/logwatch
+module github.com/sammug/logitcat
 
 go 1.26.1
 

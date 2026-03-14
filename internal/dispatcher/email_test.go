@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sammug/logwatch/internal/parser"
-	"github.com/sammug/logwatch/internal/rules"
+	"github.com/sammug/logitcat/internal/parser"
+	"github.com/sammug/logitcat/internal/rules"
 )
 
 func testAlert(severity string) rules.Alert {
@@ -55,7 +55,7 @@ func TestRenderEmailHTML(t *testing.T) {
 		"database connection failed",
 		"#d93025",         // CRITICAL red
 		"/var/log/app.log",
-		"logwatch alert",
+		"logitcat alert",
 	}
 	for _, want := range checks {
 		if !strings.Contains(html, want) {
@@ -85,18 +85,18 @@ func TestHTMLSeverityColours(t *testing.T) {
 
 func TestBuildMIME(t *testing.T) {
 	msg := buildMIME(
-		"logwatch <alerts@example.com>",
+		"logitcat <alerts@example.com>",
 		[]string{"admin@example.com", "ops@example.com"},
-		"[logwatch] [CRITICAL] test-rule triggered",
+		"[logitcat] [CRITICAL] test-rule triggered",
 		"plain text body",
 		"<html>html body</html>",
 	)
 	raw := string(msg)
 
 	checks := []string{
-		"From: logwatch <alerts@example.com>",
+		"From: logitcat <alerts@example.com>",
 		"To: admin@example.com, ops@example.com",
-		"Subject: [logwatch] [CRITICAL] test-rule triggered",
+		"Subject: [logitcat] [CRITICAL] test-rule triggered",
 		"MIME-Version: 1.0",
 		"multipart/alternative",
 		"text/plain",

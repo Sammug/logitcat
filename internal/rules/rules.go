@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sammug/logwatch/config"
-	"github.com/sammug/logwatch/internal/parser"
+	"github.com/sammug/logitcat/config"
+	"github.com/sammug/logitcat/internal/parser"
 )
 
 // Alert is produced whenever a log entry matches a rule.

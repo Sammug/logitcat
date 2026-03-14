@@ -1,4 +1,4 @@
-// Package dashboard serves the logwatch web UI and SSE/API endpoints.
+// Package dashboard serves the logitcat web UI and SSE/API endpoints.
 package dashboard
 
 import (
@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sammug/logwatch/internal/control"
+	"github.com/sammug/logitcat/internal/control"
 )
 
 //go:embed static

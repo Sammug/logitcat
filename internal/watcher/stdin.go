@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/sammug/logwatch/internal/parser"
+	"github.com/sammug/logitcat/internal/parser"
 )
 
 // ReadStdin reads lines from stdin and forwards them to out.

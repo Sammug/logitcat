@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/sammug/logwatch/internal/parser"
+	"github.com/sammug/logitcat/internal/parser"
 )
 
 const (

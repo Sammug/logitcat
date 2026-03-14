@@ -1,4 +1,4 @@
-// Package daemon manages the logwatch runtime directory, PID file, and process daemonization.
+// Package daemon manages the logitcat runtime directory, PID file, and process daemonization.
 package daemon
 
 import (
@@ -11,20 +11,20 @@ import (
 	"syscall"
 )
 
-// RuntimeDir returns (and creates) ~/.logwatch — the daemon's home directory.
+// RuntimeDir returns (and creates) ~/.logitcat — the daemon's home directory.
 func RuntimeDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = "/tmp"
 	}
-	dir := filepath.Join(home, ".logwatch")
+	dir := filepath.Join(home, ".logitcat")
 	_ = os.MkdirAll(dir, 0o700)
 	return dir
 }
 
-func PIDFile() string    { return filepath.Join(RuntimeDir(), "logwatch.pid") }
-func SocketPath() string { return filepath.Join(RuntimeDir(), "logwatch.sock") }
-func LogFile() string    { return filepath.Join(RuntimeDir(), "logwatch.log") }
+func PIDFile() string    { return filepath.Join(RuntimeDir(), "logitcat.pid") }
+func SocketPath() string { return filepath.Join(RuntimeDir(), "logitcat.sock") }
+func LogFile() string    { return filepath.Join(RuntimeDir(), "logitcat.log") }
 
 // WritePID writes the current process PID to the PID file.
 func WritePID() error {
@@ -41,7 +41,7 @@ func ReadPID() int {
 	return pid
 }
 
-// IsRunning returns true if a logwatch daemon is currently running.
+// IsRunning returns true if a logitcat daemon is currently running.
 func IsRunning() (bool, int) {
 	pid := ReadPID()
 	if pid == 0 {
@@ -83,7 +83,7 @@ func Start(args []string) error {
 		return fmt.Errorf("failed to start daemon: %w", err)
 	}
 
-	fmt.Printf("logwatch started (PID %d)\n", cmd.Process.Pid)
+	fmt.Printf("logitcat started (PID %d)\n", cmd.Process.Pid)
 	fmt.Printf("Logs: %s\n", LogFile())
 	return nil
 }

@@ -10,9 +10,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/sammug/logwatch/config"
-	"github.com/sammug/logwatch/internal/control"
-	"github.com/sammug/logwatch/internal/rules"
+	"github.com/sammug/logitcat/config"
+	"github.com/sammug/logitcat/internal/control"
+	"github.com/sammug/logitcat/internal/rules"
 )
 
 // Dispatch reads alerts, increments stats, publishes to tail subscribers,
@@ -21,7 +21,7 @@ func Dispatch(cfg *config.Config, alerts <-chan rules.Alert, stats *control.Stat
 	for a := range alerts {
 		stats.IncAlerts()
 
-		// Publish to any connected `logwatch tail` clients.
+		// Publish to any connected `logitcat tail` clients.
 		broker.Publish(control.TailEvent{
 			Time:     a.Time.Format(time.RFC3339),
 			Severity: a.Severity,

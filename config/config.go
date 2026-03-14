@@ -1,4 +1,4 @@
-// Package config loads and validates logwatch configuration from an INI file.
+// Package config loads and validates logitcat configuration from an INI file.
 package config
 
 import (
@@ -66,7 +66,7 @@ func Load(path string) (*Config, error) {
 			Port:     sec.Key("smtp_port").MustInt(587),
 			User:     sec.Key("smtp_user").String(),
 			Password: sec.Key("smtp_password").String(),
-			From:     sec.Key("smtp_from").MustString("logwatch <noreply@logwatch>"),
+			From:     sec.Key("smtp_from").MustString("logitcat <noreply@logitcat>"),
 			To:       splitTrim(sec.Key("smtp_to").String(), ","),
 		}
 	}

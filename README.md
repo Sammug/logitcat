@@ -1,4 +1,4 @@
-# logwatch 🔍
+# logitcat 🔍
 
 A lightweight, fast log parser and alerting engine written in Go.
 
@@ -25,15 +25,15 @@ Watch log files in real-time, match patterns using regex rules, and fire alerts 
 ### Build from source
 
 ```bash
-git clone https://github.com/sammug/logwatch.git
-cd logwatch
-go build -o logwatch ./cmd/logwatch
+git clone https://github.com/sammug/logitcat.git
+cd logitcat
+go build -o logitcat ./cmd/logitcat
 ```
 
 ### Run
 
 ```bash
-./logwatch config/example.ini
+./logitcat config/example.ini
 ```
 
 ---
@@ -47,7 +47,7 @@ Create a `.ini` config file:
 files = /var/log/app.log, /var/log/nginx/error.log
 
 [output]
-alert_file = /var/log/logwatch-alerts.log
+alert_file = /var/log/logitcat-alerts.log
 webhook_url = https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 
 [rule:error-detected]
@@ -95,9 +95,9 @@ cooldown  = 60
 ## Project Structure
 
 ```
-logwatch/
+logitcat/
 ├── cmd/
-│   └── logwatch/
+│   └── logitcat/
 │       └── main.go          # Entry point
 ├── config/
 │   ├── config.go            # Config loader
@@ -150,7 +150,7 @@ Alert Dispatcher
 - [x] Unit tests — parser, rules engine, config
 
 ### 🔜 Planned
-- [ ] **stdin / pipe support** — `adb logcat | logwatch watch --stdin` for IDE integration
+- [ ] **stdin / pipe support** — `adb logcat | logitcat watch --stdin` for IDE integration
 - [ ] **IDE plugins** — IntelliJ / Android Studio panel, VS Code extension
 - [ ] **Named pipe support** — watch `mkfifo` pipes like regular files
 - [ ] **Log rotation** — hot-reload config on SIGHUP (reload without restart)
@@ -158,7 +158,7 @@ Alert Dispatcher
 - [ ] **On-call schedules** — route alerts to different people by time of day
 - [ ] **Mobile push notifications** — iOS / Android alert delivery
 - [ ] **Multi-server** — aggregate logs from multiple machines into one dashboard
-- [ ] **logwatch Cloud** — hosted SaaS version, no server required
+- [ ] **logitcat Cloud** — hosted SaaS version, no server required
 
 ---
 

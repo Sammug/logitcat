@@ -10,7 +10,7 @@ import (
 // writeTemp writes content to a temp file and returns its path.
 func writeTemp(t *testing.T, content string) string {
 	t.Helper()
-	f, err := os.CreateTemp(t.TempDir(), "logwatch-*.ini")
+	f, err := os.CreateTemp(t.TempDir(), "logitcat-*.ini")
 	if err != nil {
 		t.Fatalf("createTemp: %v", err)
 	}
@@ -178,7 +178,7 @@ smtp_host     = smtp.gmail.com
 smtp_port     = 587
 smtp_user     = alerts@example.com
 smtp_password = secret
-smtp_from     = logwatch <alerts@example.com>
+smtp_from     = logitcat <alerts@example.com>
 smtp_to       = admin@example.com, ops@example.com
 `)
 	cfg, err := Load(path)
@@ -218,8 +218,8 @@ smtp_host = smtp.example.com
 	if cfg.SMTP.Port != 587 {
 		t.Errorf("default Port = %d, want 587", cfg.SMTP.Port)
 	}
-	if !strings.Contains(cfg.SMTP.From, "logwatch") {
-		t.Errorf("default From = %q, want logwatch in it", cfg.SMTP.From)
+	if !strings.Contains(cfg.SMTP.From, "logitcat") {
+		t.Errorf("default From = %q, want logitcat in it", cfg.SMTP.From)
 	}
 }
 

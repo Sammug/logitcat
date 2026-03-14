@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sammug/logwatch/config"
-	"github.com/sammug/logwatch/internal/parser"
+	"github.com/sammug/logitcat/config"
+	"github.com/sammug/logitcat/internal/parser"
 )
 
 // makeEntry is a helper to build a LogEntry for tests.

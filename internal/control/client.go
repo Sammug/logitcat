@@ -76,7 +76,7 @@ func (c *Client) Tail(fn func(TailEvent) bool) error {
 func (c *Client) dial() (net.Conn, error) {
 	conn, err := net.DialTimeout("unix", c.socketPath, 2*time.Second)
 	if err != nil {
-		return nil, fmt.Errorf("cannot connect to logwatch daemon: %w", err)
+		return nil, fmt.Errorf("cannot connect to logitcat daemon: %w", err)
 	}
 	return conn, nil
 }
