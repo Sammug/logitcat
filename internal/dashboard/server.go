@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/sammug/logitcat/internal/control"
@@ -101,7 +102,27 @@ func IsDaemonRunning(port string) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// handleLogStream streams every parsed log line as SSE (event: log).
+// levelRank maps level strings to a numeric rank for filtering.
+// Higher rank = more severe. Default (unknown) = 0 (pass all).
+var levelRank = map[string]int{
+	"verbose": 1, "v": 1,
+	"debug":   2, "d": 2,
+	"info":    3, "i": 3,
+	"warn": 4, "warning": 4, "w": 4,
+	"error": 5, "e": 5,
+	"fatal": 6, "f": 6, "assert": 6, "a": 6,
+}
+
+func minLevelRank(s string) int {
+	if r, ok := levelRank[strings.ToLower(s)]; ok {
+		return r
+	}
+	return 0 // unknown → pass everything
+}
+
+// handleLogStream streams parsed log lines as SSE (event: log).
+// Query param: ?level=V|D|I|W|E|F  — server-side minimum level filter.
+// Default: level=V (all lines). Use level=W to reduce traffic significantly.
 func (s *Server) handleLogStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -114,6 +135,8 @@ func (s *Server) handleLogStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	minRank := minLevelRank(r.URL.Query().Get("level")) // 0 = pass all
+
 	ch := s.logBroker.Subscribe()
 	defer s.logBroker.Unsubscribe(ch)
 
@@ -125,6 +148,10 @@ func (s *Server) handleLogStream(w http.ResponseWriter, r *http.Request) {
 		case event, ok := <-ch:
 			if !ok {
 				return
+			}
+			// Server-side level filter — drop below requested minimum
+			if minRank > 0 && levelRank[strings.ToLower(event.Level)] < minRank {
+				continue
 			}
 			data, _ := json.Marshal(event)
 			fmt.Fprintf(w, "event: log\ndata: %s\n\n", data)
