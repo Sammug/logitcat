@@ -2,6 +2,7 @@
 package dashboard
 
 import (
+	"bytes"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/sammug/logitcat/internal/control"
 )
+
+func bytesReader(b []byte) *bytes.Reader { return bytes.NewReader(b) }
 
 //go:embed static
 var staticFiles embed.FS
@@ -42,12 +45,59 @@ func (s *Server) Listen() error {
 	// API endpoints
 	mux.HandleFunc("/api/status", s.handleStatus)
 	mux.HandleFunc("/api/events", s.handleSSE)
+	mux.HandleFunc("/api/alert", s.handlePushAlert)
 
 	log.Printf("dashboard: listening on http://localhost%s", s.addr)
 	return http.ListenAndServe(s.addr, mux)
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
+
+// handlePushAlert accepts a TailEvent JSON body from pipe mode and
+// broadcasts it to all SSE subscribers — allowing pipe + daemon to coexist.
+func (s *Server) handlePushAlert(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	var event control.TailEvent
+	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+		http.Error(w, "bad JSON", http.StatusBadRequest)
+		return
+	}
+	s.broker.Publish(event)
+	s.stats.IncAlerts()
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ForwardAlert sends a TailEvent to a running daemon's /api/alert endpoint.
+// Returns true if the daemon accepted it.
+func ForwardAlert(port string, event control.TailEvent) bool {
+	data, err := json.Marshal(event)
+	if err != nil {
+		return false
+	}
+	resp, err := http.Post(
+		fmt.Sprintf("http://localhost%s/api/alert", port),
+		"application/json",
+		bytesReader(data),
+	)
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return resp.StatusCode == http.StatusNoContent
+}
+
+// IsDaemonRunning returns true if a logitcat dashboard is reachable on port.
+func IsDaemonRunning(port string) bool {
+	resp, err := http.Get(fmt.Sprintf("http://localhost%s/api/status", port))
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
+}
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")

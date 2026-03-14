@@ -159,6 +159,16 @@ func (b *Broker) Unsubscribe(ch chan TailEvent) {
 	close(ch)
 }
 
+// Close unsubscribes all subscribers — used by pipe mode on EOF.
+func (b *Broker) Close() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for ch := range b.subs {
+		delete(b.subs, ch)
+		close(ch)
+	}
+}
+
 // Publish broadcasts an event to all active tail subscribers.
 // Slow subscribers are skipped (non-blocking send).
 func (b *Broker) Publish(e TailEvent) {

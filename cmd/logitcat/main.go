@@ -165,6 +165,21 @@ func cmdPipe() {
 	}
 	broker := control.NewBroker()
 
+	// Subscribe to forwarding BEFORE pipeline starts so no events are missed.
+	forwardDone := make(chan struct{})
+	daemonRunning := showDash && dashboard.IsDaemonRunning(cfg.DashboardAddr)
+	var forwardCh chan control.TailEvent
+	if daemonRunning {
+		forwardCh = broker.Subscribe()
+		log.Printf("dashboard: daemon already running on %s — forwarding alerts to it", cfg.DashboardAddr)
+		go func() {
+			for event := range forwardCh {
+				dashboard.ForwardAlert(cfg.DashboardAddr, event)
+			}
+			close(forwardDone)
+		}()
+	}
+
 	// Pipeline channels
 	rawLines := make(chan parser.RawLine, 1000)
 	entries  := make(chan parser.LogEntry, 1000)
@@ -183,13 +198,17 @@ func cmdPipe() {
 	go dispatcher.Dispatch(cfg, alerts, stats, broker)
 
 	if showDash {
-		dash := dashboard.NewServer(cfg.DashboardAddr, stats, broker)
-		go func() {
-			if err := dash.Listen(); err != nil {
-				log.Printf("dashboard: %v", err)
-			}
-		}()
-		log.Printf("dashboard: http://localhost%s", cfg.DashboardAddr)
+		if daemonRunning {
+			// Already set up above — nothing more to do here
+		} else {
+			dash := dashboard.NewServer(cfg.DashboardAddr, stats, broker)
+			go func() {
+				if err := dash.Listen(); err != nil {
+					log.Printf("dashboard: %v", err)
+				}
+			}()
+			log.Printf("dashboard: http://localhost%s", cfg.DashboardAddr)
+		}
 	}
 
 	log.Printf("logitcat pipe: reading stdin as %q — %d rule(s) active", source, len(cfg.Rules))
@@ -199,8 +218,14 @@ func cmdPipe() {
 
 	select {
 	case <-stdinDone:
-		// Give pipeline a moment to drain then exit cleanly
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(400 * time.Millisecond)
+		if forwardCh != nil {
+			broker.Unsubscribe(forwardCh)
+			select {
+			case <-forwardDone:
+			case <-time.After(2 * time.Second):
+			}
+		}
 		log.Printf("logitcat pipe: done. %d alert(s) fired.", stats.AlertCount())
 	case <-quit:
 		log.Println("logitcat pipe: interrupted.")
@@ -288,6 +313,17 @@ func cmdRun(isDaemon bool) {
 
 	log.Println("logitcat stopped.")
 	srv.Close()
+}
+
+// forwardAlertsToDaemon subscribes to the local broker and POSTs each event
+// to the already-running daemon's /api/alert endpoint so all SSE clients
+// (IDE plugins, dashboard) see alerts from both the daemon and pipe mode.
+func forwardAlertsToDaemon(addr string, broker *control.Broker) {
+	ch := broker.Subscribe()
+	// Do NOT defer Unsubscribe — broker.Close() will close ch for us.
+	for event := range ch {
+		dashboard.ForwardAlert(addr, event)
+	}
 }
 
 func fatalf(format string, args ...any) {
