@@ -163,7 +163,8 @@ func cmdPipe() {
 		Files:      []string{source},
 		RuleCount:  len(cfg.Rules),
 	}
-	broker := control.NewBroker()
+	broker    := control.NewBroker()
+	logBroker := control.NewLogBroker()
 
 	// Subscribe to forwarding BEFORE pipeline starts so no events are missed.
 	forwardDone := make(chan struct{})
@@ -181,9 +182,10 @@ func cmdPipe() {
 	}
 
 	// Pipeline channels
-	rawLines := make(chan parser.RawLine, 1000)
-	entries  := make(chan parser.LogEntry, 1000)
-	alerts   := make(chan rules.Alert, 100)
+	rawLines  := make(chan parser.RawLine, 1000)
+	entries   := make(chan parser.LogEntry, 1000)
+	entries2  := make(chan parser.LogEntry, 1000) // tee for log broadcast
+	alerts    := make(chan rules.Alert, 100)
 
 	// Stdin reader — signals done when stdin closes
 	stdinDone := make(chan struct{})
@@ -194,14 +196,15 @@ func cmdPipe() {
 	}()
 
 	go parser.Run(rawLines, entries)
-	go rules.Match(cfg.Rules, entries, alerts)
+	go teeLogEntries(entries, entries2, logBroker, source)
+	go rules.Match(cfg.Rules, entries2, alerts)
 	go dispatcher.Dispatch(cfg, alerts, stats, broker)
 
 	if showDash {
 		if daemonRunning {
 			// Already set up above — nothing more to do here
 		} else {
-			dash := dashboard.NewServer(cfg.DashboardAddr, stats, broker)
+			dash := dashboard.NewServer(cfg.DashboardAddr, stats, broker, logBroker)
 			go func() {
 				if err := dash.Listen(); err != nil {
 					log.Printf("dashboard: %v", err)
@@ -251,7 +254,8 @@ func cmdRun(isDaemon bool) {
 		Files:      cfg.Files,
 		RuleCount:  len(cfg.Rules),
 	}
-	broker := control.NewBroker()
+	broker    := control.NewBroker()
+	logBroker := control.NewLogBroker()
 
 	if isDaemon {
 		if err := daemon.WritePID(); err != nil {
@@ -263,6 +267,7 @@ func cmdRun(isDaemon bool) {
 	// Pipeline channels
 	rawLines := make(chan parser.RawLine, 1000)
 	entries  := make(chan parser.LogEntry, 1000)
+	entries2 := make(chan parser.LogEntry, 1000)
 	alerts   := make(chan rules.Alert, 100)
 
 	// Control server (IPC)
@@ -283,12 +288,13 @@ func cmdRun(isDaemon bool) {
 	// Pipeline stages
 	go watcher.Watch(cfg.Files, rawLines)
 	go parser.Run(rawLines, entries)
-	go rules.Match(cfg.Rules, entries, alerts)
+	go teeLogEntries(entries, entries2, logBroker, "daemon")
+	go rules.Match(cfg.Rules, entries2, alerts)
 	go dispatcher.Dispatch(cfg, alerts, stats, broker)
 
 	// Dashboard (optional)
 	if cfg.DashboardAddr != "" {
-		dash := dashboard.NewServer(cfg.DashboardAddr, stats, broker)
+		dash := dashboard.NewServer(cfg.DashboardAddr, stats, broker, logBroker)
 		go func() {
 			if err := dash.Listen(); err != nil {
 				log.Printf("dashboard: %v", err)
@@ -313,6 +319,24 @@ func cmdRun(isDaemon bool) {
 
 	log.Println("logitcat stopped.")
 	srv.Close()
+}
+
+// teeLogEntries fans out parsed entries: one copy to rules engine,
+// one broadcast to the LogBroker for /api/logs SSE clients.
+func teeLogEntries(in <-chan parser.LogEntry, out chan<- parser.LogEntry, lb *control.LogBroker, source string) {
+	for e := range in {
+		out <- e
+		lb.Publish(control.LogEvent{
+			Time:    e.Time.Format(time.RFC3339),
+			Level:   e.Level,
+			Source:  source,
+			Message: e.Message,
+			Format:  string(e.Format),
+			Raw:     e.Raw,
+			Fields:  e.Fields,
+		})
+	}
+	close(out)
 }
 
 // forwardAlertsToDaemon subscribes to the local broker and POSTs each event

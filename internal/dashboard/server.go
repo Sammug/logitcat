@@ -21,14 +21,15 @@ var staticFiles embed.FS
 
 // Server exposes the dashboard HTTP server.
 type Server struct {
-	addr   string
-	stats  *control.Stats
-	broker *control.Broker
+	addr      string
+	stats     *control.Stats
+	broker    *control.Broker
+	logBroker *control.LogBroker
 }
 
 // NewServer creates a dashboard Server bound to addr (e.g. ":9090").
-func NewServer(addr string, stats *control.Stats, broker *control.Broker) *Server {
-	return &Server{addr: addr, stats: stats, broker: broker}
+func NewServer(addr string, stats *control.Stats, broker *control.Broker, logBroker *control.LogBroker) *Server {
+	return &Server{addr: addr, stats: stats, broker: broker, logBroker: logBroker}
 }
 
 // Listen registers routes and starts the HTTP server. Blocks until error.
@@ -46,6 +47,7 @@ func (s *Server) Listen() error {
 	mux.HandleFunc("/api/status", s.handleStatus)
 	mux.HandleFunc("/api/events", s.handleSSE)
 	mux.HandleFunc("/api/alert", s.handlePushAlert)
+	mux.HandleFunc("/api/logs", s.handleLogStream)
 
 	log.Printf("dashboard: listening on http://localhost%s", s.addr)
 	return http.ListenAndServe(s.addr, mux)
@@ -97,6 +99,43 @@ func IsDaemonRunning(port string) bool {
 	}
 	resp.Body.Close()
 	return resp.StatusCode == http.StatusOK
+}
+
+// handleLogStream streams every parsed log line as SSE (event: log).
+func (s *Server) handleLogStream(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	ch := s.logBroker.Subscribe()
+	defer s.logBroker.Unsubscribe(ch)
+
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case event, ok := <-ch:
+			if !ok {
+				return
+			}
+			data, _ := json.Marshal(event)
+			fmt.Fprintf(w, "event: log\ndata: %s\n\n", data)
+			flusher.Flush()
+		case <-ticker.C:
+			fmt.Fprintf(w, ": ping\n\n")
+			flusher.Flush()
+		case <-r.Context().Done():
+			return
+		}
+	}
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {

@@ -33,6 +33,18 @@ type AckResponse struct {
 	Message string `json:"message,omitempty"`
 }
 
+// LogEvent is every parsed log line — streamed to /api/logs regardless of rule match.
+type LogEvent struct {
+	Time    string            `json:"time"`
+	Level   string            `json:"level"`
+	Source  string            `json:"source"`
+	Message string            `json:"message"`
+	Format  string            `json:"format"`
+	Raw     string            `json:"raw"`
+	Fields  map[string]string `json:"fields,omitempty"`
+	Tag     string            `json:"tag,omitempty"`
+}
+
 // TailEvent is a single streamed alert pushed to tail subscribers.
 type TailEvent struct {
 	Time     string            `json:"time"`

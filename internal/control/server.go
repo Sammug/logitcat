@@ -181,3 +181,39 @@ func (b *Broker) Publish(e TailEvent) {
 		}
 	}
 }
+
+// LogBroker streams every parsed log line (not just rule matches).
+type LogBroker struct {
+	mu   sync.RWMutex
+	subs map[chan LogEvent]struct{}
+}
+
+func NewLogBroker() *LogBroker {
+	return &LogBroker{subs: make(map[chan LogEvent]struct{})}
+}
+
+func (b *LogBroker) Subscribe() chan LogEvent {
+	ch := make(chan LogEvent, 256)
+	b.mu.Lock()
+	b.subs[ch] = struct{}{}
+	b.mu.Unlock()
+	return ch
+}
+
+func (b *LogBroker) Unsubscribe(ch chan LogEvent) {
+	b.mu.Lock()
+	delete(b.subs, ch)
+	b.mu.Unlock()
+	close(ch)
+}
+
+func (b *LogBroker) Publish(e LogEvent) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	for ch := range b.subs {
+		select {
+		case ch <- e:
+		default:
+		}
+	}
+}
