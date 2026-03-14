@@ -21,12 +21,19 @@ import (
 const usage = `logwatch — lightweight log parser and alerting engine
 
 Usage:
-  logwatch start  <config.ini>   start daemon in the background
-  logwatch stop                  stop the running daemon
-  logwatch status                show daemon health and metrics
-  logwatch tail                  stream live alerts from the daemon
-  logwatch reload                hot-reload the daemon's config
-  logwatch run    <config.ini>   run in the foreground (dev mode)
+  logwatch start  <config.ini>             start daemon in the background
+  logwatch stop                            stop the running daemon
+  logwatch status                          show daemon health and metrics
+  logwatch tail                            stream live alerts from the daemon
+  logwatch reload                          hot-reload the daemon's config
+  logwatch run    <config.ini>             run in the foreground (dev mode)
+  logwatch pipe   <config.ini> [--source <name>] [--dashboard]
+                                           read from stdin, apply rules, alert
+
+Examples:
+  adb logcat | logwatch pipe android.ini --source adb-logcat --dashboard
+  gradle build 2>&1 | logwatch pipe gradle.ini
+  tail -f app.log   | logwatch pipe rules.ini --source myapp
 `
 
 func main() {
@@ -48,6 +55,8 @@ func main() {
 		cmdReload()
 	case "run":
 		cmdRun(false)
+	case "pipe":
+		cmdPipe()
 	case "--daemon": // internal flag used by start to run the actual daemon
 		cmdRun(true)
 	default:
@@ -117,6 +126,85 @@ func cmdReload() {
 		fatalf("reload failed: %v", err)
 	}
 	fmt.Println("logwatch:", resp.Message)
+}
+
+// cmdPipe reads log lines from stdin, parses and matches them, then dispatches alerts.
+// Flags: --source <name>  sets the source label (default "stdin")
+//        --dashboard      also start the web dashboard
+func cmdPipe() {
+	if len(os.Args) < 3 {
+		fatalf("usage: logwatch pipe <config.ini> [--source <name>] [--dashboard]")
+	}
+	configPath := os.Args[2]
+
+	// Parse optional flags
+	source := "stdin"
+	showDash := false
+	for i := 3; i < len(os.Args); i++ {
+		switch os.Args[i] {
+		case "--source":
+			if i+1 < len(os.Args) {
+				source = os.Args[i+1]
+				i++
+			}
+		case "--dashboard":
+			showDash = true
+		}
+	}
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		log.Fatalf("config: %v", err)
+	}
+
+	stats := &control.Stats{
+		StartTime:  time.Now(),
+		ConfigPath: configPath,
+		Files:      []string{source},
+		RuleCount:  len(cfg.Rules),
+	}
+	broker := control.NewBroker()
+
+	// Pipeline channels
+	rawLines := make(chan parser.RawLine, 1000)
+	entries  := make(chan parser.LogEntry, 1000)
+	alerts   := make(chan rules.Alert, 100)
+
+	// Stdin reader — signals done when stdin closes
+	stdinDone := make(chan struct{})
+	go func() {
+		watcher.ReadStdin(source, rawLines)
+		close(rawLines)
+		close(stdinDone)
+	}()
+
+	go parser.Run(rawLines, entries)
+	go rules.Match(cfg.Rules, entries, alerts)
+	go dispatcher.Dispatch(cfg, alerts, stats, broker)
+
+	if showDash {
+		dash := dashboard.NewServer(cfg.DashboardAddr, stats, broker)
+		go func() {
+			if err := dash.Listen(); err != nil {
+				log.Printf("dashboard: %v", err)
+			}
+		}()
+		log.Printf("dashboard: http://localhost%s", cfg.DashboardAddr)
+	}
+
+	log.Printf("logwatch pipe: reading stdin as %q — %d rule(s) active", source, len(cfg.Rules))
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case <-stdinDone:
+		// Give pipeline a moment to drain then exit cleanly
+		time.Sleep(200 * time.Millisecond)
+		log.Printf("logwatch pipe: done. %d alert(s) fired.", stats.AlertCount())
+	case <-quit:
+		log.Println("logwatch pipe: interrupted.")
+	}
 }
 
 // cmdRun starts the full pipeline — either in foreground (dev) or as the daemon process.
