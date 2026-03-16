@@ -48,6 +48,7 @@ func (s *Server) Listen() error {
 	mux.HandleFunc("/api/status", s.handleStatus)
 	mux.HandleFunc("/api/events", s.handleSSE)
 	mux.HandleFunc("/api/alert", s.handlePushAlert)
+	mux.HandleFunc("/api/log", s.handlePushLog)
 	mux.HandleFunc("/api/logs", s.handleLogStream)
 
 	log.Printf("dashboard: listening on http://localhost%s", s.addr)
@@ -71,6 +72,38 @@ func (s *Server) handlePushAlert(w http.ResponseWriter, r *http.Request) {
 	s.broker.Publish(event)
 	s.stats.IncAlerts()
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handlePushLog accepts a LogEvent JSON body from pipe mode and broadcasts
+// it to all /api/logs SSE subscribers.
+func (s *Server) handlePushLog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	var event control.LogEvent
+	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+		http.Error(w, "bad JSON", http.StatusBadRequest)
+		return
+	}
+	s.logBroker.Publish(event)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ForwardLog sends a LogEvent to a running daemon's /api/log endpoint.
+func ForwardLog(port string, event control.LogEvent) {
+	data, err := json.Marshal(event)
+	if err != nil {
+		return
+	}
+	resp, err := http.Post(
+		fmt.Sprintf("http://localhost%s/api/log", port),
+		"application/json",
+		bytesReader(data),
+	)
+	if err == nil {
+		resp.Body.Close()
+	}
 }
 
 // ForwardAlert sends a TailEvent to a running daemon's /api/alert endpoint.

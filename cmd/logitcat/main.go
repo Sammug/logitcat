@@ -169,15 +169,49 @@ func cmdPipe() {
 	// Subscribe to forwarding BEFORE pipeline starts so no events are missed.
 	forwardDone := make(chan struct{})
 	daemonRunning := showDash && dashboard.IsDaemonRunning(cfg.DashboardAddr)
-	var forwardCh chan control.TailEvent
+	var forwardCh    chan control.TailEvent
+	var forwardLogCh chan control.LogEvent
 	if daemonRunning {
-		forwardCh = broker.Subscribe()
-		log.Printf("dashboard: daemon already running on %s — forwarding alerts to it", cfg.DashboardAddr)
+		forwardCh    = broker.Subscribe()
+		forwardLogCh = logBroker.Subscribe()
+		log.Printf("dashboard: daemon already running on %s — forwarding alerts + logs to it", cfg.DashboardAddr)
+
+		// Forward matched alerts
 		go func() {
 			for event := range forwardCh {
 				dashboard.ForwardAlert(cfg.DashboardAddr, event)
 			}
-			close(forwardDone)
+		}()
+
+		// Forward raw log lines (batched every 50ms to reduce HTTP overhead)
+		go func() {
+			defer close(forwardDone)
+			ticker := time.NewTicker(50 * time.Millisecond)
+			defer ticker.Stop()
+			var batch []control.LogEvent
+			flush := func() {
+				for _, e := range batch {
+					dashboard.ForwardLog(cfg.DashboardAddr, e)
+				}
+				batch = batch[:0]
+			}
+			for {
+				select {
+				case e, ok := <-forwardLogCh:
+					if !ok {
+						flush()
+						return
+					}
+					batch = append(batch, e)
+					if len(batch) >= 50 {
+						flush()
+					}
+				case <-ticker.C:
+					if len(batch) > 0 {
+						flush()
+					}
+				}
+			}
 		}()
 	}
 
@@ -224,6 +258,9 @@ func cmdPipe() {
 		time.Sleep(400 * time.Millisecond)
 		if forwardCh != nil {
 			broker.Unsubscribe(forwardCh)
+		}
+		if forwardLogCh != nil {
+			logBroker.Unsubscribe(forwardLogCh)
 			select {
 			case <-forwardDone:
 			case <-time.After(2 * time.Second):
